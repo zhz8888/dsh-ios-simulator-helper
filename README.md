@@ -1,17 +1,38 @@
 # dsh-ios-simulator-helper
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/README.md) | [简体中文](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/README.zh-CN.md)
 
-The package is published as `@zhz8888/dsh-ios-simulator-helper`, and the plugin page shows its localized name — **iOS Simulator** in English, **iOS 模拟器** in Chinese — read from `locale/en.json` and `locale/zh.json`, which carry the one-line description too.
+[![npm version](https://img.shields.io/npm/v/@zhz8888/dsh-ios-simulator-helper.svg)](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper)
+[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE)
+![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
+[![target: DSH](https://img.shields.io/badge/DSH-0.2.x-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a full **settings page** (Settings → iOS Simulator) that edits the simulator parameters in-app instead of through environment variables.
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
 - 17 settings fields in 5 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
 - The settings page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every `ios_*` tool refuses in one clear sentence instead of failing with `spawn xcrun ENOENT`.
+- Published as `@zhz8888/dsh-ios-simulator-helper`, and the plugin page shows the name from `locale/en.json` and `locale/zh.json` — **iOS Simulator** / **iOS 模拟器** — rather than the raw package name.
+
+## Quick start
+
+On a Mac with full Xcode, at least one iOS runtime and DSH installed:
+
+1. **Install the plugin**
+
+   ```bash
+   dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
+   ```
+
+   In DSH Desktop, open **Plugins** and add the same package name there. Reload or restart DSH afterwards.
+
+2. **Check the machine** — open **Settings → iOS Simulator** and press **Run diagnostic**. It runs exactly the checks `ios_preflight` runs (full Xcode, a simulator runtime, `idb`), and prints a fix for anything missing.
+
+3. **Use it** — ask for what you want ("build and run this project on the iPhone 16 simulator", "screenshot the running app"), or call the 21 `ios_*` tools directly. Everything the tools need is editable on that settings page.
 
 ## Contents
 
+- [Quick start](#quick-start)
 - [Requirements](#requirements)
 - [Install](#install)
 - [Settings page](#settings-page)
@@ -21,8 +42,10 @@ A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0`
 - [Differences from the original](#differences-from-the-original)
 - [Architecture](#architecture)
 - [Development and verification](#development-and-verification)
+- [Releases and versioning](#releases-and-versioning)
 - [Marketplace listing](#marketplace-listing)
 - [Known limitations](#known-limitations)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## Requirements
@@ -39,54 +62,30 @@ A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0`
 
 ## Install
 
-### 1. Install dependencies
-
-The package ships source plus a hand-written client bundle; the runtime dependencies come from the DSH profile.
-
 ```bash
-cd /path/to/dsh-ios-simulator-helper
-pnpm install
+dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
 ```
 
-`@deepseek-ai/schemastery`, `@deepseek-ai/dsh-tools` and `@deepseek-ai/cordis` are **peer dependencies**: the harness ships all three, so the plugin declares the versions it is built against instead of pulling in a second copy. DSH's compatibility gate compares the `@deepseek-ai/dsh*` ranges in `peerDependencies` against the running version and refuses to install on a mismatch. The package has no runtime dependencies of its own.
+**DSH Desktop**: the `desktop` profile belongs to the Electron app — open **Plugins**, add `@zhz8888/dsh-ios-simulator-helper` there, and enable the row it creates.
 
-### 2. Install into a profile
+The published tarball contains everything the plugin needs — the host half, the browser bundle, the bundled skill and the `locale/` entries — and nothing is compiled at install time, so no build approval step is involved.
 
-**DSH Desktop (local GUI)**: the `desktop` profile is owned by the Electron app. Add this directory through the app's **plugin manager** (install from a local path).
+`package.json` declares `dsh.bundle.patch`, so DSH's reconcile step appends the package to `dsh.profile.bundles`, profile boot merges `cordis.patch.yml`, and exactly one host row is mounted. `@deepseek-ai/cordis`, `@deepseek-ai/dsh-tools` and `@deepseek-ai/schemastery` are **peer dependencies** provided by the harness: the plugin declares the versions it is built against instead of pulling in a second copy, and it has no runtime dependencies of its own. DSH's compatibility gate compares the `@deepseek-ai/dsh*` peer ranges against the running version and refuses to install on a mismatch.
 
-**CLI / any other profile**:
+> Mount the package exactly once. `dsh plugin add` records the row in `dsh.profile.bundles`; adding a second row for the same package in the profile's own `cordis.patch.yml` registers every tool name twice and fails at the loader.
 
-```bash
-dsh plugin --profile <profile> add /absolute/path/to/dsh-ios-simulator-helper
-```
-
-`package.json` declares `dsh.bundle.patch`, so DSH's reconcile step appends this package to `dsh.profile.bundles`, profile boot merges `cordis.patch.yml`, and exactly one host row is mounted.
-
-**Manual install** (no CLI): add the package as a `file:` dependency in the profile and append its name to `dsh.profile.bundles`:
-
-```jsonc
-// ~/.dsh/profiles/<profile>/package.json
-{
-  "dependencies": {
-    "@zhz8888/dsh-ios-simulator-helper": "file:/absolute/path/to/dsh-ios-simulator-helper"
-  },
-  "dsh": {
-    "profile": {
-      "bundles": ["@deepseek-ai/dsh-base", "…", "@zhz8888/dsh-ios-simulator-helper"]
-    }
-  }
-}
-```
-
-```bash
-cd ~/.dsh/profiles/<profile> && pnpm install
-```
-
-Do **not** also add the row to the profile's own `cordis.patch.yml`: mounting the package twice registers the same tool names twice and fails at the loader. Use one channel only.
-
-### 3. Open the settings page
+### Open the settings page
 
 After a reload or restart, open **Settings → iOS Simulator**. The page only appears while the host half actually serves this plugin's settings namespace; otherwise it leaves no trace.
+
+### Upgrade and uninstall
+
+```bash
+dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper@latest   # upgrade
+dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # uninstall
+```
+
+Settings live in the profile, not in the package, so both commands leave them in place. The data directory (by default `$DSH_HOME/ios-simulator-helper`) holds screenshots, build logs and DerivedData; it is yours to delete, and uninstalling does not touch it.
 
 ## Settings page
 
@@ -128,19 +127,19 @@ All four are the live page in DSH Desktop, in the order you scroll it — nothin
 
 **1. Simulator and device** — the fields every `ios_*` call reads:
 
-![The iOS Simulator settings page in DSH Desktop: the simulator-and-device group with default device, default runtime, auto boot, auto open and the boot timeout](assets/settings-page-1-simulator-and-device.png)
+![The iOS Simulator settings page in DSH Desktop: the simulator-and-device group with default device, default runtime, auto boot, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI automation and builds** — the `idb` backend and its timeout, then the `xcodebuild` configuration, build timeout and extra arguments:
 
-![The page scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](assets/settings-page-2-ui-automation-and-build.png)
+![The page scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
 **3. Logs and output** — the DerivedData directory and code-signing switch, then the `ios_logs` window and character limit, then where screenshots, logs and DerivedData land:
 
-![The page scrolled further: DerivedData directory, code signing during builds, the default log window and character limit, and the data and screenshot directories](assets/settings-page-3-logs-and-output.png)
+![The page scrolled further: DerivedData directory, code signing during builds, the default log window and character limit, and the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
 **4. Host check and save** — the macOS verdict and the detected platform, the two detection buttons, and the save button:
 
-![The bottom of the page: the host check reading "macOS — supported (darwin/arm64)", the run-diagnostic and refresh buttons, and the save button](assets/settings-page-4-host-check.png)
+![The bottom of the page: the host check reading "macOS — supported (darwin/arm64)", the run-diagnostic and refresh buttons, and the save button](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` lists these four files in this order next to `package.json`, which is how a plugin market finds them. `assets/` holds only these curated shots; run output and verification captures stay out of the repository (see `.gitignore`).
 
@@ -229,8 +228,10 @@ Four constraints shaped the layout:
 ## Development and verification
 
 ```bash
-pnpm install                  # schemastery + react/react-dom (tests only)
-pnpm test                     # 80 tests, no Xcode and no simulator required
+git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
+cd dsh-ios-simulator-helper
+pnpm install                  # test dependencies only (react, react-dom)
+pnpm test                     # 86 tests, no Xcode and no simulator required
 pnpm run check                # tests + host/client consistency gate + real Cordis mount
 pnpm run verify:mount         # real Cordis Context + real ToolRuntime registry
 pnpm run smoke                # read-only probes on the real machine
@@ -254,6 +255,33 @@ pnpm run link:dsh-deps        # offline development: symlink the local DSH @deep
 
 `smoke` covers what only a real machine can prove: Xcode discovery, actual `simctl` calls, whether the generated project compiles, product discovery and bundle-id resolution, and install / launch / screenshot / logs / terminate / shutdown.
 
+## Releases and versioning
+
+| Release | Date | npm | GitHub |
+|---|---|---|---|
+| `v1.0.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.0.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [release notes](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0) |
+
+A release is the same commit in two places, and that is checkable:
+
+```bash
+npm view @zhz8888/dsh-ios-simulator-helper@1.0.0 gitHead --registry https://registry.npmjs.org
+git rev-parse v1.0.0^{commit}   # prints the same commit
+```
+
+**Cutting a release**
+
+1. Bump `version` in `package.json` and commit it. The history uses `build: bump the version to x.y.z`.
+2. Publish from the tagged commit:
+
+   ```bash
+   npm publish --registry https://registry.npmjs.org --access public
+   ```
+
+   Both flags matter here: a typical local `.npmrc` points `registry` at a read-only mirror, and a scoped package stays private without `--access public`. On a 2FA account npm adds a browser approval step, which stages a temporary `0.0.0-stage` version before the real one.
+3. Write the GitHub Release for the tag — in English and Chinese, following the sections of the previous release: what the version contains, what changed, how to install it, and what was verified.
+
+> The README rendered on the npm page is the copy **inside the published tarball**, so README edits reach npm only with the next publish.
+
 ## Marketplace listing
 
 This repository is shaped for the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) list and its [contributing guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md). What that guide asks for, and where it lives here:
@@ -270,13 +298,15 @@ This repository is shaped for the [awesome-dsh-plugin](https://github.com/awesom
 
 The submission itself is a single file in the list repository — `data/plugins/zhz8888__dsh-ios-simulator-helper.yml`, with `url: https://github.com/zhz8888/dsh-ios-simulator-helper`, `name: zhz8888/dsh-ios-simulator-helper` and a `description.en` that states only what the code does. Category `dev`: the plugin builds, runs and inspects iOS apps from the harness.
 
-Three things no repository can do for itself, and the only ones left:
+Already in place:
 
-1. **Push this repository to `https://github.com/zhz8888/dsh-ios-simulator-helper`.** The list's CI fetches `package.json` from that exact URL, which is why `repository`, `homepage` and `bugs` here already name it. If the repository ends up under another owner or name, change those three fields (and the test that pins them) first.
-2. **Add the `dsh-plugin` topic** to the GitHub repository.
-3. **Wait a day.** The CI rejects repositories younger than 24 hours, so the pull request cannot be opened the same day the repository is created.
+- The repository is public at [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper), carrying the `dsh-plugin` topic and ten more.
+- The package is on npm, so a storefront can show a download figure; its `repository` field points back here, which is what links the two.
+- `v1.0.0` is tagged and has a GitHub Release.
 
-Publishing to npm is optional and changes nothing about listing; if you do publish, the package's `repository` field already points back here, which is what links the two.
+Still outstanding:
+
+- **The repository has to be at least 24 hours old.** The list's CI rejects younger repositories, so the pull request can only be opened after that.
 
 ## Known limitations
 
@@ -286,10 +316,14 @@ Publishing to npm is optional and changes nothing about listing; if you do publi
 - `ios_logs` reads `log show` (no live stream), with a configurable and clamped window and length.
 - Swift-macro projects cannot be compiled when the caller is itself sandboxed (see `--no-macros`); DSH host-half code runs outside the bash sandbox, so normal use is unaffected.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.
-- **The settings page has been eyeballed once, in DSH Desktop**: the package was installed into the `desktop` profile from a local path, the page opened at Settings → iOS Simulator, and the four shots in `assets/` are that session, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are covered by the render tests, not by eye.
+- **The settings page has been eyeballed once, in DSH Desktop**: the plugin was installed into the `desktop` profile, the page opened at Settings → iOS Simulator, and the four shots in `assets/` are that session, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are covered by the render tests, not by eye.
 - `@deepseek-ai/dsh-client-ui-primitives` is a browser bundler input (`*.module.css`, `simple-icons`, `zustand/vanilla`) that plain Node cannot import, so the render tests double that package; React itself and `react-dom/server` are real.
 - No credential handling: the plugin never reads or forwards key/token/secret environment variables.
 
+## Contributing
+
+Issues and pull requests are welcome at [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper/issues). Every change has to keep `pnpm check` green — it runs the unit tests, the bundle consistency gate and the real-host mount, see [Development and verification](#development-and-verification). There is no CLA and no form to fill in: a focused pull request that says what it changes and why is enough.
+
 ## License
 
-[MIT](LICENSE), copyright (c) 2026 zhz8888. Tool definitions, provider logic and the generated SwiftUI project template are ported from the ZCode official `ios-simulator` plugin, distributed under the MIT License by Z.ai; the template sources are kept verbatim. See the attribution at the end of [LICENSE](LICENSE).
+[MIT](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE), copyright (c) 2026 zhz8888. Tool definitions, provider logic and the generated SwiftUI project template are ported from the ZCode official `ios-simulator` plugin, distributed under the MIT License by Z.ai; the template sources are kept verbatim. See the attribution at the end of [LICENSE](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE).

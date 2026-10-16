@@ -1,17 +1,38 @@
 # dsh-ios-simulator-helper
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/README.md) | [简体中文](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/README.zh-CN.md)
 
-包名为 `@zhz8888/dsh-ios-simulator-helper`，插件页显示的名称由 `locale/en.json` 与 `locale/zh.json` 提供——英文 **iOS Simulator**、中文 **iOS 模拟器**，一句话简介也取自这两个文件。
+[![npm version](https://img.shields.io/npm/v/@zhz8888/dsh-ios-simulator-helper.svg)](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper)
+[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE)
+![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
+[![target: DSH](https://img.shields.io/badge/DSH-0.2.x-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个完整的 **设置页面**（设置 → iOS 模拟器），让默认设备、运行时、UI 后端、构建参数与输出目录都能在应用里配置，而不是靠环境变量。
 
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
 - 设置页 5 组 17 个字段，全部实时生效；空值按「设置页 → 原插件环境变量 → 内置默认值」顺序回落。
 - 设置页会检测宿主系统：**非 macOS 时直接提示该插件仅支持 macOS**，且所有 `ios_*` 工具都会以一句话拒绝执行，而不是抛出 `spawn xcrun ENOENT`。
+- npm 包名为 `@zhz8888/dsh-ios-simulator-helper`，插件页显示的名称由 `locale/en.json` 与 `locale/zh.json` 提供——英文 **iOS Simulator**、中文 **iOS 模拟器**——而不是裸包名。
+
+## 快速上手
+
+在装了完整 Xcode、至少一个 iOS 运行时和 DSH 的 Mac 上：
+
+1. **安装插件**
+
+   ```bash
+   dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
+   ```
+
+   DSH Desktop 则在左侧「插件」页里添加同一个包名。装完重载或重启 DSH。
+
+2. **检查环境** —— 打开 **设置 → iOS 模拟器**，点「检测环境」。它跑的正是 `ios_preflight` 的那套检查（完整 Xcode、模拟器运行时、`idb`），缺什么就给修复建议。
+
+3. **开始使用** —— 直接说需求（「把这个工程在 iPhone 16 模拟器上构建并跑起来」「给正在运行的 App 截个图」），或直接调用 21 个 `ios_*` 工具。工具需要的参数都能在那个设置页里改。
 
 ## 目录
 
+- [快速上手](#快速上手)
 - [环境要求](#环境要求)
 - [安装](#安装)
 - [设置页面](#设置页面)
@@ -21,8 +42,11 @@
 - [与原插件的差异](#与原插件的差异)
 - [架构](#架构)
 - [开发与验证](#开发与验证)
+- [版本与发布](#版本与发布)
 - [插件市场收录](#插件市场收录)
 - [已知限制](#已知限制)
+- [参与贡献](#参与贡献)
+- [许可](#许可)
 
 ## 环境要求
 
@@ -38,54 +62,30 @@
 
 ## 安装
 
-### 1. 安装依赖
-
-包本身只发布源码与手写的客户端 bundle，运行依赖由 DSH profile 提供。
-
 ```bash
-cd /path/to/dsh-ios-simulator-helper
-pnpm install
+dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
 ```
 
-`@deepseek-ai/schemastery`、`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/cordis` 一律声明为 **peer 依赖**：这三个包由 DSH 宿主提供，插件只声明自己构建时对应的版本区间，避免再装进第二份。DSH 的兼容性闸门按 `peerDependencies` 里 `@deepseek-ai/dsh*` 的版本区间与运行时版本比对，不匹配会明确拒装。本包自身没有任何运行时依赖。
+**DSH Desktop**：`desktop` profile 由 Electron 应用自身管理，在左侧「插件」页里添加 `@zhz8888/dsh-ios-simulator-helper`，再把生成的条目打开即可。
 
-### 2. 装进 profile
+发布出去的 tarball 里已经包含插件运行所需的一切——host 半侧、浏览器 bundle、随包 skill 与 `locale/` 条目——安装期不编译任何东西，因此不涉及构建授权步骤。
 
-**DSH Desktop（本机 GUI）**：`desktop` profile 由 Electron 应用自身管理，请在应用内的**插件管理器**里添加本目录（本地路径安装）。
+`package.json` 声明了 `dsh.bundle.patch`，安装后 DSH 的 reconcile 会把本包追加到 `dsh.profile.bundles`，profile 启动时合并 `cordis.patch.yml`，挂载唯一一行 host 入口。`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/schemastery` 是 **peer 依赖**，由 DSH 宿主提供：插件只声明自己构建时对应的版本区间，避免再装第二份，本包自身没有任何运行时依赖。DSH 的兼容性闸门按 `peerDependencies` 里 `@deepseek-ai/dsh*` 的版本区间与运行时版本比对，不匹配会明确拒装。
 
-**CLI / 其他 profile**：
+> 只能挂载一次。`dsh plugin add` 已经把入口写进 `dsh.profile.bundles`；再往 profile 自己的 `cordis.patch.yml` 里加同一行会让同名工具二次注册，并在加载期直接报错。
 
-```bash
-dsh plugin --profile <profile> add /absolute/path/to/dsh-ios-simulator-helper
-```
-
-`package.json` 已声明 `dsh.bundle.patch`，因此安装后 DSH 的 reconcile 会自动把本包追加到 `dsh.profile.bundles`，profile 启动时合并 `cordis.patch.yml`，挂载唯一一行 host 入口。
-
-**手工安装**（没有 CLI 时）：在 profile 目录里把本包作为 `file:` 依赖加入，并把包名追加到 `dsh.profile.bundles`：
-
-```jsonc
-// ~/.dsh/profiles/<profile>/package.json
-{
-  "dependencies": {
-    "@zhz8888/dsh-ios-simulator-helper": "file:/absolute/path/to/dsh-ios-simulator-helper"
-  },
-  "dsh": {
-    "profile": {
-      "bundles": ["@deepseek-ai/dsh-base", "…", "@zhz8888/dsh-ios-simulator-helper"]
-    }
-  }
-}
-```
-
-```bash
-cd ~/.dsh/profiles/<profile> && pnpm install
-```
-
-**不要**再手动往 profile 自己的 `cordis.patch.yml` 里加同一行：重复挂载会让同名工具二次注册并在加载期报错，只能二选一。
-
-### 3. 打开设置页
+### 打开设置页
 
 重载/重启后打开 **设置 → iOS 模拟器**。页面在 host 半侧真正提供了该设置命名空间时才会出现；反之不会留下任何痕迹。
+
+### 升级与卸载
+
+```bash
+dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper@latest   # 升级
+dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # 卸载
+```
+
+设置保存在 profile 里而不是包里，所以这两条命令都不会动它。数据目录（默认 `$DSH_HOME/ios-simulator-helper`）存放截图、构建日志与 DerivedData，卸载不会删除它，是否清理由你决定。
 
 ## 设置页面
 
@@ -127,19 +127,19 @@ cd ~/.dsh/profiles/<profile> && pnpm install
 
 **1. 模拟器与设备** —— 每次 `ios_*` 调用都会读取的字段：
 
-![DSH Desktop 里的 iOS 模拟器设置页：模拟器与设备分组，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](assets/settings-page-1-simulator-and-device.png)
+![DSH Desktop 里的 iOS 模拟器设置页：模拟器与设备分组，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI 自动化与构建** —— `idb` 后端与其超时，接着是 `xcodebuild` 的配置、构建超时与额外参数：
 
-![滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](assets/settings-page-2-ui-automation-and-build.png)
+![滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
 **3. 日志与输出** —— DerivedData 目录与代码签名开关，`ios_logs` 的窗口与字符上限，以及截图/日志/DerivedData 的落盘位置：
 
-![继续向下滚动：DerivedData 目录、构建时禁用代码签名、默认日志窗口与默认日志字符上限，以及数据目录与截图目录](assets/settings-page-3-logs-and-output.png)
+![继续向下滚动：DerivedData 目录、构建时禁用代码签名、默认日志窗口与默认日志字符上限，以及数据目录与截图目录](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
 **4. 宿主检测与保存** —— macOS 判定与检测到的平台、两个检测按钮，以及保存按钮：
 
-![页面底部：宿主系统判定为「macOS —— 符合要求（darwin/arm64）」、检测环境与刷新模拟器按钮，以及保存按钮](assets/settings-page-4-host-check.png)
+![页面底部：宿主系统判定为「macOS —— 符合要求（darwin/arm64）」、检测环境与刷新模拟器按钮，以及保存按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` 就在 `package.json` 旁边按这个顺序列出四张图，插件市场据此展示。`assets/` 只放这些精选截图；运行产物与验证截图不进仓库（见 `.gitignore`）。
 
@@ -228,8 +228,10 @@ dsh-ios-simulator-helper/
 ## 开发与验证
 
 ```bash
-pnpm install                  # schemastery + react/react-dom（测试用）
-pnpm test                     # 80 个测试（不需要 Xcode，不需要模拟器）
+git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
+cd dsh-ios-simulator-helper
+pnpm install                  # 只装测试依赖（react、react-dom）
+pnpm test                     # 86 个测试（不需要 Xcode，不需要模拟器）
 pnpm run check                # 测试 + host/client 一致性闸门 + 真实 Cordis 挂载验证
 pnpm run verify:mount         # 真实 Cordis Context + 真实 ToolRuntime 注册表
 pnpm run smoke                # 只读真机探测：preflight / 模拟器 / 运行时 / 项目发现 / inventory
@@ -253,6 +255,33 @@ pnpm run link:dsh-deps        # 离线开发：把本机 DSH 的 @deepseek-ai �
 
 `smoke` 覆盖只有真机才能证明的部分：Xcode 探测、`simctl` 实际调用、生成工程能否编译、产物发现与 bundle id 解析、安装/启动/截图/日志/结束/关闭。
 
+## 版本与发布
+
+| 版本 | 日期 | npm | GitHub |
+|---|---|---|---|
+| `v1.0.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.0.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [Release 说明](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0) |
+
+一次发布意味着同一个提交出现在两个地方，而且这件事是可核对的：
+
+```bash
+npm view @zhz8888/dsh-ios-simulator-helper@1.0.0 gitHead --registry https://registry.npmjs.org
+git rev-parse v1.0.0^{commit}   # 两者应打印同一个提交
+```
+
+**发布新版本**
+
+1. 改 `package.json` 的 `version` 并提交（历史里的写法是 `build: bump the version to x.y.z`）。
+2. 在打 tag 的那个提交上发布：
+
+   ```bash
+   npm publish --registry https://registry.npmjs.org --access public
+   ```
+
+   两个参数都必须带：本机 `.npmrc` 的 `registry` 通常指向只读镜像；scoped 包不加 `--access public` 会保持私有。开了两步验证的账号会多一步浏览器授权，npm 会先建一个临时的 `0.0.0-stage` 版本再发布正式版本。
+3. 给 tag 写 GitHub Release——中英双语，栏目照上一版：这一版包含什么、改了什么、怎么安装、做过哪些验证。
+
+> npm 包页上渲染的 README 是**发布出去的 tarball 里**那一份，所以这里改了 README 要等下一次发版才会反映到 npm 上。
+
 ## 插件市场收录
 
 本仓库按 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 的[贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md)整理。指南的每一条要求与本仓库的对应位置：
@@ -269,13 +298,15 @@ pnpm run link:dsh-deps        # 离线开发：把本机 DSH 的 @deepseek-ai �
 
 投稿本体是列表仓库里的单个文件 `data/plugins/zhz8888__dsh-ios-simulator-helper.yml`（`url` 与 `name` 用上面的仓库地址，`description.en` 只描述代码实际做的事）。分类选 `dev`：这个插件做的是构建、运行与检查 iOS 应用。
 
-剩下三件事只能由仓库之外完成：
+已经就位：
 
-1. **把本仓库推送到 `https://github.com/zhz8888/dsh-ios-simulator-helper`。** 列表的 CI 会从这个确切地址读取 `package.json`，所以本仓库的 `repository` / `homepage` / `bugs` 已经写成它。若最终用别的 owner 或仓库名，先改这三个字段（以及断言它们的测试）。
-2. **给 GitHub 仓库加上 `dsh-plugin` topic。**
-3. **等满一天。** CI 会拒绝创建不足 24 小时的仓库，因此 PR 不能在建仓当天提交。
+- 仓库已在 [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper) 公开，带 `dsh-plugin` 等 11 个 topic。
+- 包已发布到 npm，市场可以显示下载量；包的 `repository` 字段指回本仓库，这就是两者建立关联的依据。
+- `v1.0.0` 已打 tag 并有对应的 GitHub Release。
 
-发布到 npm 是可选项，不影响收录；一旦发布，包的 `repository` 字段已指回本仓库，这就是两者建立关联的依据。
+还差一件事：
+
+- **仓库要满 24 小时。** 列表 CI 会拒绝创建不足 24 小时的仓库，所以 PR 只能在那之后提交。
 
 ## 已知限制
 
@@ -285,13 +316,17 @@ pnpm run link:dsh-deps        # 离线开发：把本机 DSH 的 @deepseek-ai �
 - `ios_logs` 与原插件一样只做 `log show`（不做实时流），窗口与长度可配置且有上限。
 - Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；**在沙箱内调用本插件时这类工程无法编译**（真机集成测试因此提供 `--no-macros`）。DSH 宿主半侧的代码运行在 bash 沙箱之外，正常使用不受影响。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。
-- **设置页已在 DSH Desktop 里人工目视确认过一次**：把本包以本地路径装进 `desktop` profile，打开「设置 → iOS 模拟器」，`assets/` 里那四张按顺序就是那次的真实界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
+- **设置页已在 DSH Desktop 里人工目视确认过一次**：把插件装进 `desktop` profile，打开「设置 → iOS 模拟器」，`assets/` 里那四张按顺序就是那次的真实界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
 - `@deepseek-ai/dsh-client-ui-primitives` 是浏览器打包产物（依赖 `*.module.css`、`simple-icons`、`zustand/vanilla`），Node 无法直接 import，因此渲染测试对该包使用忠实替身；真实 React 与 `react-dom/server` 仍是真件。
 - 插件不触碰凭据：不读取、不转发任何含 key/token/secret 的环境变量。
 
+## 参与贡献
+
+问题与 PR 都欢迎提到 [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper/issues)。每个改动都要保持 `pnpm check` 全绿——它会跑单元测试、host/client 一致性闸门和真实宿主挂载，见[开发与验证](#开发与验证)。没有 CLA，也没有需要填的表单：一个说明改了什么、为什么改的聚焦 PR 就够了。
+
 ## 许可
 
-[MIT](LICENSE)，版权所有 (c) 2026 zhz8888。
+[MIT](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE)，版权所有 (c) 2026 zhz8888。
 
 工具与 provider 逻辑移植自 ZCode 官方 `ios-simulator` 插件（同样以 MIT 分发，版权归 Z.ai），
-SwiftUI 工程模板逐字保留；完整的来源与版权说明见 [LICENSE](LICENSE) 末尾的归属章节。
+SwiftUI 工程模板逐字保留；完整的来源与版权说明见 [LICENSE](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE) 末尾的归属章节。

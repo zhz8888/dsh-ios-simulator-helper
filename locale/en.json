@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "iOS Simulator",
+    "description": "Drives the iOS Simulator from DeepSeek Harness: 21 native ios_* tools for Xcode project discovery, build, install, launch, screenshots and logs, plus a settings page for the simulator, the idb backend and xcodebuild."
+  }
+}

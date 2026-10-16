@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+The package is published as `@zhz8888/dsh-ios-simulator-helper`, and the plugin page shows its localized name — **iOS Simulator** in English, **iOS 模拟器** in Chinese — read from `locale/en.json` and `locale/zh.json`, which carry the one-line description too.
+
 A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a full **settings page** (Settings → iOS Simulator) that edits the simulator parameters in-app instead of through environment variables.
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
@@ -66,11 +68,11 @@ dsh plugin --profile <profile> add /absolute/path/to/dsh-ios-simulator-helper
 // ~/.dsh/profiles/<profile>/package.json
 {
   "dependencies": {
-    "dsh-ios-simulator-helper": "file:/absolute/path/to/dsh-ios-simulator-helper"
+    "@zhz8888/dsh-ios-simulator-helper": "file:/absolute/path/to/dsh-ios-simulator-helper"
   },
   "dsh": {
     "profile": {
-      "bundles": ["@deepseek-ai/dsh-base", "…", "dsh-ios-simulator-helper"]
+      "bundles": ["@deepseek-ai/dsh-base", "…", "@zhz8888/dsh-ios-simulator-helper"]
     }
   }
 }
@@ -198,8 +200,10 @@ Keeping direct spawns is a deliberate trade-off: `xcodebuild`, `simctl` and `idb
 ```
 dsh-ios-simulator-helper/
 ├── package.json            # dsh.bundle.patch, dsh.client, peer dependencies (compatibility gate)
-├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: 'dsh-ios-simulator-helper' }]
+├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: '@zhz8888/dsh-ios-simulator-helper' }]
 ├── ios.svg                 # plugin icon: iOS wordmark in its original colour, inverted in dark mode
+├── locale/en.json          # plugin-page name and description (English; its presence is what enables every other language)
+├── locale/zh.json          # the Simplified Chinese pair
 ├── README.md               # this file (English, primary)
 ├── README.zh-CN.md         # Simplified Chinese edition
 ├── lib/
@@ -215,11 +219,12 @@ dsh-ios-simulator-helper/
 └── test/                   # node:test unit and integration tests
 ```
 
-Three constraints shaped the layout:
+Four constraints shaped the layout:
 
 1. **The settings namespace has exactly one source of truth**: the profile patch row id. The `id` in `cordis.patch.yml`, `SETTINGS_NAMESPACE` in `lib/settings.js` and the literal in `lib/client.js` must agree; `scripts/check-bundle.mjs` verifies them, the field-table drift between the two halves, the three routes, and that the macOS logic is still in place.
 2. **A browser bundle cannot import a host module** (the client purity gate forbids cross-plugin value imports), so the field table is written twice and kept honest by that gate; the bundle may only `require` the shell's nine static modules (React, Cordis, `dsh-client-store`, `dsh-client-ui-slots`, `dsh-client-ui-primitives`, `dsh-client-ui-dockkit`, …).
 3. **The platform check is centralised**: `hostInfo()` / `requireMacOS()` in `lib/providers/host.js` are the only places that read platform semantics, and the platform is an injectable parameter, so the non-macOS branch is testable on a Mac.
+4. **The plugin-page name is a package resource, not a manifest field**: DSH resolves `<package>/locale/en.json` through the `exports` map, so `./locale/*.json` has to stay exported and `locale` has to stay in `files`; either omission degrades silently to showing the raw package name. `en.json` is also the switch that enables every other language file, so it cannot be dropped in favour of `zh.json`. `test/manifest.test.js` pins all three conditions.
 
 ## Development and verification
 

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "iOS 模拟器",
+    "description": "在 DeepSeek Harness 里驱动 iOS 模拟器：21 个原生 ios_* 工具覆盖工程发现、构建、安装、启动、截图与日志，并提供设置页配置模拟器、idb 后端与 xcodebuild。"
+  }
+}

@@ -16,7 +16,7 @@ import { FIELD_KEYS, SETTINGS_NAMESPACE } from '../lib/settings.js'
 
 test('client bundle registers under the package name', () => {
   const { registration } = loadBundle()
-  assert.equal(registration.id, 'dsh-ios-simulator-helper')
+  assert.equal(registration.id, '@zhz8888/dsh-ios-simulator-helper')
   assert.equal(typeof registration.factory, 'function')
 })
 
@@ -54,7 +54,7 @@ test('client bundle is a classic script, not an ES module', () => {
 test('client bundle tags its stylesheet for framework reclamation', () => {
   const source = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
   assert.match(source, /tag\.dataset\.pluginCss = CSS_TAG/)
-  assert.match(source, /tag\.dataset\.plugin = "dsh-ios-simulator-helper"/)
+  assert.match(source, /tag\.dataset\.plugin = "@zhz8888\/dsh-ios-simulator-helper"/)
 })
 
 test('client bundle calls exactly the routes the host registers', () => {

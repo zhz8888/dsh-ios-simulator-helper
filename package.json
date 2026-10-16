@@ -1,5 +1,5 @@
 {
-  "name": "dsh-ios-simulator-helper",
+  "name": "@zhz8888/dsh-ios-simulator-helper",
   "version": "0.1.0",
   "icon": "./ios.svg",
   "description": "iOS Simulator management for DeepSeek Harness: Xcode project discovery and scaffolding, simulator boot/install/launch/terminate, screenshots, logs and optional idb UI automation, ported from the official ZCode ios-simulator plugin, with a full in-app settings page and a macOS-only host check.",
@@ -33,11 +33,13 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
     "skills",
+    "locale",
     "cordis.patch.yml",
     "ios.svg",
     "README.md",

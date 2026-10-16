@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+包名为 `@zhz8888/dsh-ios-simulator-helper`，插件页显示的名称由 `locale/en.json` 与 `locale/zh.json` 提供——英文 **iOS Simulator**、中文 **iOS 模拟器**，一句话简介也取自这两个文件。
+
 把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个完整的 **设置页面**（设置 → iOS 模拟器），让默认设备、运行时、UI 后端、构建参数与输出目录都能在应用里配置，而不是靠环境变量。
 
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
@@ -65,11 +67,11 @@ dsh plugin --profile <profile> add /absolute/path/to/dsh-ios-simulator-helper
 // ~/.dsh/profiles/<profile>/package.json
 {
   "dependencies": {
-    "dsh-ios-simulator-helper": "file:/absolute/path/to/dsh-ios-simulator-helper"
+    "@zhz8888/dsh-ios-simulator-helper": "file:/absolute/path/to/dsh-ios-simulator-helper"
   },
   "dsh": {
     "profile": {
-      "bundles": ["@deepseek-ai/dsh-base", "…", "dsh-ios-simulator-helper"]
+      "bundles": ["@deepseek-ai/dsh-base", "…", "@zhz8888/dsh-ios-simulator-helper"]
     }
   }
 }
@@ -197,8 +199,10 @@ cd ~/.dsh/profiles/<profile> && pnpm install
 ```
 dsh-ios-simulator-helper/
 ├── package.json            # dsh.bundle.patch、dsh.client、peer 依赖（兼容性闸门）
-├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: 'dsh-ios-simulator-helper' }]
+├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: '@zhz8888/dsh-ios-simulator-helper' }]
 ├── ios.svg                 # 插件图标：iOS 字标，沿用原版取色，深色模式自适应反色
+├── locale/en.json          # 插件页名称与简介（英文；它的存在与否决定其他语言文件是否生效）
+├── locale/zh.json          # 对应的简体中文
 ├── README.md               # 英文版（默认）
 ├── README.zh-CN.md         # 本文件（简体中文）
 ├── lib/
@@ -214,11 +218,12 @@ dsh-ios-simulator-helper/
 └── test/                   # node:test 单元与集成测试
 ```
 
-三个约束决定了上面的形状：
+四个约束决定了上面的形状：
 
 1. **设置命名空间只有一个真相来源**：profile patch 行 id。`cordis.patch.yml` 的 `id`、`lib/settings.js` 的 `SETTINGS_NAMESPACE`、`lib/client.js` 的字面量必须一致；`scripts/check-bundle.mjs` 会校验它们，也会校验 host 与 client 两份字段表无漂移、三个路由两侧一致、macOS 判定逻辑仍在。
 2. **browser bundle 不能 import host 模块**（客户端纯度闸门禁止跨插件值导入），因此字段表被写了两遍，靠闸门保持一致；bundle 只能 `require` 宿主的 9 个静态模块（React、Cordis、`dsh-client-store`、`dsh-client-ui-slots`、`dsh-client-ui-primitives`、`dsh-client-ui-dockkit` 等）。
 3. **平台检查中央化**：`lib/providers/host.js` 的 `hostInfo()` / `requireMacOS()` 是唯一读取 `process.platform` 语义的地方，且平台是可注入参数，因此非 macOS 分支可以在 macOS 上被测试。
+4. **插件页显示名是包资源，不是 manifest 字段**：DSH 通过 `exports` 映射解析 `<包名>/locale/en.json`，所以 `./locale/*.json` 必须保持导出、`locale` 必须留在 `files` 里——缺任何一项都会静默退回显示裸包名。`en.json` 同时是其他语言文件的总开关，不能只留 `zh.json`。这三条都由 `test/manifest.test.js` 锁住。
 
 ## 开发与验证
 

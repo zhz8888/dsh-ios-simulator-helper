@@ -1,0 +1,40 @@
+<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>iOS Simulator helper</title>
+  <!--
+    The iOS wordmark, fitted to the 36x36 frame DSH uses for plugin icons.
+
+    `dsh-app-boot` admits this file as plugin metadata and serves its raw bytes
+    as an exported resource, so the icon is rendered as an image, never inlined:
+    it cannot inherit `currentColor` and has to carry its own adaptivity.
+
+    The ink keeps the glyph's original colour (#2c2c2c) for the light theme and
+    flips to its exact inverse (#d3d3d3) under `prefers-color-scheme: dark`.
+    Declaring `color-scheme: light dark` on the root is what makes the file a
+    colour-scheme aware image: a supporting engine then resolves the media query
+    from the *embedding* element's colour scheme, so the icon follows the DSH
+    theme rather than only the operating system. Engines that do not implement
+    that fall back to the system preference, which is the same behaviour as the
+    rest of the app's own `prefers-color-scheme` styles.
+
+    The ink also sits in a nested viewport inset by 4px, so the wordmark is
+    optically centred with even margins instead of touching the frame edges.
+  -->
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    .ismh-ink {
+      fill: #2c2c2c;
+    }
+    @media (prefers-color-scheme: dark) {
+      .ismh-ink {
+        fill: #d3d3d3;
+      }
+    }
+  </style>
+  <!-- viewBox is the wordmark's own ink box, so the nested viewport fits it
+       automatically and stays correct if the path is ever re-tightened. -->
+  <svg x="4" y="4" width="28" height="28" viewBox="0 258 1028 508" preserveAspectRatio="xMidYMid meet">
+    <path class="ismh-ink" d="M46.933333 258.133333c-26.197333 0-46.933333 20.48-46.933333 46.08a46.08 46.08 0 0 0 46.933333 46.08c26.453333 0 47.36-20.48 47.36-46.08 0-25.6-20.906667-46.08-47.36-46.08m324.693334 0.853334c-143.36 0-232.96 97.706667-232.96 253.013333 0 156.586667 89.6 253.866667 232.96 253.866667 142.506667 0 232.533333-97.28 232.533333-253.866667 0-155.306667-90.026667-253.013333-232.533333-253.013333m462.506666 0c-106.666667 0-182.613333 58.88-182.613333 146.346666 0 69.546667 43.093333 113.066667 133.546667 133.973334l63.573333 15.36c61.866667 14.08 87.04 34.56 87.04 69.973333 0 40.96-41.386667 69.973333-100.266667 69.973333-60.16 0-105.386667-29.44-110.08-74.666666h-85.333333c3.413333 90.453333 77.653333 145.92 190.293333 145.92 119.04 0 193.706667-58.453333 193.706667-151.466667 0-72.96-42.666667-114.346667-141.653333-136.96l-56.746667-12.8c-60.16-14.506667-84.906667-33.706667-84.906667-66.133333 0-40.96 37.546667-68.266667 93.013334-68.266667 55.893333 0 94.293333 27.733333 98.56 73.386667h83.626666c-2.133333-86.186667-73.386667-144.64-181.76-144.64M371.626667 333.653333c87.04 0 142.933333 69.546667 142.933333 178.346667 0 109.653333-55.893333 179.2-142.933333 179.2-87.893333 0-143.36-69.546667-143.36-179.2 0-108.8 55.466667-178.346667 143.36-178.346667M4.736 397.226667v360.533333H89.6V397.226667H4.693333z" />
+  </svg>
+</svg>

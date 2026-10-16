@@ -1,0 +1,55 @@
+# dsh-ios-simulator-helper — things that must never be committed.
+#
+# The published package is defined by the `files` field in package.json, not by
+# this file: everything below is development state, and test/manifest.test.js
+# asserts that none of it can reach the tarball.
+
+# --- dependencies ---------------------------------------------------------
+node_modules/
+# pnpm keeps a store next to the project when no global one is configured.
+.pnpm-store/
+
+# --- scratch directories --------------------------------------------------
+# Smoke runs, throwaway DSH trial profiles and any other local scratch space.
+.tmp-*/
+.dsh-*/
+
+# --- test and coverage output --------------------------------------------
+coverage/
+*.lcov
+.nyc_output/
+
+# --- packaging output -----------------------------------------------------
+*.tgz
+*.tar.gz
+
+# --- test artifacts, logs and local captures ------------------------------
+# What `pnpm test`, scripts/verify-mount.mjs and scripts/smoke.mjs produce —
+# screenshots, build logs, DerivedData — is evidence, not source: it stays in
+# the plugin data directory or in the throwaway project the smoke run creates.
+# The durable record of a run belongs in the project memory, never here.
+docs/verification/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+*.tmp
+*.temp
+.cache/
+/*.png
+
+# --- editors and IDEs -----------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- operating systems ----------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100/
+.Trashes
+Thumbs.db
+desktop.ini

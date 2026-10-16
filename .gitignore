@@ -28,6 +28,10 @@ coverage/
 # screenshots, build logs, DerivedData — is evidence, not source: it stays in
 # the plugin data directory or in the throwaway project the smoke run creates.
 # The durable record of a run belongs in the project memory, never here.
+#
+# `assets/` is the one exception, and it is not a capture directory: it holds
+# the hand-picked screenshots that `screenshots.json` declares to a plugin
+# market, so those files are tracked on purpose.
 docs/verification/
 *.log
 npm-debug.log*

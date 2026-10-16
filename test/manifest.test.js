@@ -65,7 +65,25 @@ test('declares the bundle patch and a web client half', () => {
 test('pins the DSH releases the host half is built against', () => {
   assert.match(manifest.peerDependencies['@deepseek-ai/dsh-tools'], /0\.2\.0-rc\.2/)
   assert.match(manifest.peerDependencies['@deepseek-ai/cordis'], /4\.0\.4/)
-  assert.match(manifest.dependencies['@deepseek-ai/schemastery'], /3\.18\.4/)
+  assert.match(manifest.peerDependencies['@deepseek-ai/schemastery'], /3\.18\.4/)
+})
+
+test('official @deepseek-ai packages are peers, never runtime dependencies', () => {
+  // The harness ships these packages, so a `dependencies` entry would make the
+  // install resolve a second, unshared copy of a package the host already owns.
+  for (const name of Object.keys(manifest.dependencies ?? {})) {
+    assert.ok(!name.startsWith('@deepseek-ai/'), `${name} must be a peerDependency, not a dependency`)
+  }
+})
+
+test('a peer range naming a prerelease also names the next prerelease tuple', () => {
+  // node-semver only lets a prerelease satisfy a range when some comparator on
+  // the same major.minor.patch carries a prerelease tag itself: `^0.2.0-rc.2`
+  // alone silently excludes 0.2.1-alpha.5, which is how users meet ERESOLVE.
+  for (const [name, range] of Object.entries(manifest.peerDependencies)) {
+    if (!/-(?:rc|alpha|beta)\.\d+/.test(range)) continue
+    assert.match(range, /\|\|/, `${name} needs an explicit branch for the next prerelease tuple`)
+  }
 })
 
 test('the shipped files list covers every path the host reads at runtime', () => {
@@ -132,6 +150,32 @@ test('the icon keeps the original ink and inverts it exactly for dark mode', () 
     .map((offset) => (255 - Number.parseInt(light.slice(1 + offset, 3 + offset), 16)).toString(16).padStart(2, '0'))
     .join('')}`
   assert.equal(dark?.toLowerCase(), inverse, 'the dark ink must be the exact inverse of the light ink')
+})
+
+test('the repository fields name the public repo a plugin list links to', () => {
+  // The marketplace entry carries `url:` and the storefront reads this manifest
+  // from that exact URL, so the two have to agree or the plugin is not linked.
+  assert.equal(manifest.repository.url, 'git+https://github.com/zhz8888/dsh-ios-simulator-helper.git')
+  assert.equal(manifest.homepage, 'https://github.com/zhz8888/dsh-ios-simulator-helper#readme')
+  assert.equal(manifest.bugs.url, 'https://github.com/zhz8888/dsh-ios-simulator-helper/issues')
+})
+
+test('the screenshot manifest lists 1-8 images that exist inside the repo', () => {
+  // `screenshots.json` next to package.json is what a storefront reads; the
+  // paths are relative to it and may not leave the plugin directory.
+  const file = path.join(ROOT, 'screenshots.json')
+  assert.ok(existsSync(file), 'screenshots.json is missing')
+  const parsed = JSON.parse(readFileSync(file, 'utf8'))
+  const list = Array.isArray(parsed) ? parsed : parsed.screenshots
+  assert.ok(Array.isArray(list), 'screenshots.json must be a list or {"screenshots": [...]}')
+  assert.ok(list.length >= 1 && list.length <= 8, `expected 1-8 screenshots, saw ${list.length}`)
+  for (const entry of list) {
+    assert.equal(typeof entry, 'string', 'every screenshot entry must be a path')
+    assert.ok(!entry.startsWith('/'), `${entry} must be relative to screenshots.json`)
+    assert.ok(!entry.split('/').includes('..'), `${entry} must stay inside the plugin directory`)
+    assert.match(entry, /\.(png|jpe?g|webp)$/i, `${entry} must be an image`)
+    assert.ok(existsSync(path.join(ROOT, entry)), `${entry} is declared but missing`)
+  }
 })
 
 test('the patch mounts exactly one row whose id is the settings namespace', () => {

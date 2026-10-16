@@ -13,11 +13,13 @@ A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0`
 - [Requirements](#requirements)
 - [Install](#install)
 - [Settings page](#settings-page)
+- [Screenshots](#screenshots)
 - [Tools](#tools)
 - [Skill and slash command](#skill-and-slash-command)
 - [Differences from the original](#differences-from-the-original)
 - [Architecture](#architecture)
 - [Development and verification](#development-and-verification)
+- [Marketplace listing](#marketplace-listing)
 - [Known limitations](#known-limitations)
 - [License](#license)
 
@@ -44,7 +46,7 @@ cd /path/to/dsh-ios-simulator-helper
 pnpm install
 ```
 
-`@deepseek-ai/schemastery` is a normal dependency; `@deepseek-ai/dsh-tools` and `@deepseek-ai/cordis` are peer dependencies provided by the host. DSH's compatibility gate compares the `@deepseek-ai/dsh*` ranges in `peerDependencies` against the running version and refuses to install on a mismatch.
+`@deepseek-ai/schemastery`, `@deepseek-ai/dsh-tools` and `@deepseek-ai/cordis` are **peer dependencies**: the harness ships all three, so the plugin declares the versions it is built against instead of pulling in a second copy. DSH's compatibility gate compares the `@deepseek-ai/dsh*` ranges in `peerDependencies` against the running version and refuses to install on a mismatch. The package has no runtime dependencies of its own.
 
 ### 2. Install into a profile
 
@@ -117,6 +119,28 @@ Below the form sit the host check and three buttons:
 ### Legacy configuration
 
 The original plugin's `userConfig` (`default_device`, `ui_backend`) and its environment variables `IOS_SIM_DEFAULT_DEVICE`, `IOS_SIM_UI_BACKEND` and `IOS_SIM_PLUGIN_DATA` still work as fallbacks (last column above), so an existing ZCode or CI setup needs no change. The original's `IOS_SIM_PACKAGE_ROOT` only located the plugin for its own MCP launcher; DSH resolves the package path directly and does not need it.
+
+## Screenshots
+
+All four are the live page in DSH Desktop, in the order you scroll it — nothing is mocked up.
+
+**1. Simulator and device** — the fields every `ios_*` call reads:
+
+![The iOS Simulator settings page in DSH Desktop: the simulator-and-device group with default device, default runtime, auto boot, auto open and the boot timeout](assets/settings-page-1-simulator-and-device.png)
+
+**2. UI automation and builds** — the `idb` backend and its timeout, then the `xcodebuild` configuration, build timeout and extra arguments:
+
+![The page scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](assets/settings-page-2-ui-automation-and-build.png)
+
+**3. Logs and output** — the DerivedData directory and code-signing switch, then the `ios_logs` window and character limit, then where screenshots, logs and DerivedData land:
+
+![The page scrolled further: DerivedData directory, code signing during builds, the default log window and character limit, and the data and screenshot directories](assets/settings-page-3-logs-and-output.png)
+
+**4. Host check and save** — the macOS verdict and the detected platform, the two detection buttons, and the save button:
+
+![The bottom of the page: the host check reading "macOS — supported (darwin/arm64)", the run-diagnostic and refresh buttons, and the save button](assets/settings-page-4-host-check.png)
+
+`screenshots.json` lists these four files in this order next to `package.json`, which is how a plugin market finds them. `assets/` holds only these curated shots; run output and verification captures stay out of the repository (see `.gitignore`).
 
 ## Tools
 
@@ -225,6 +249,30 @@ pnpm run link:dsh-deps        # offline development: symlink the local DSH @deep
 
 `smoke` covers what only a real machine can prove: Xcode discovery, actual `simctl` calls, whether the generated project compiles, product discovery and bundle-id resolution, and install / launch / screenshot / logs / terminate / shutdown.
 
+## Marketplace listing
+
+This repository is shaped for the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) list and its [contributing guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md). What that guide asks for, and where it lives here:
+
+| Requirement | Where it is satisfied |
+|---|---|
+| A `dsh.bundle` manifest in `package.json` — the thing that makes `dsh plugin add` work | `dsh.bundle.patch` → `./cordis.patch.yml`; asserted by `test/manifest.test.js` |
+| A `cordis.patch.yml` next to `package.json` that mounts the plugin | `cordis.patch.yml`, one `insert` row whose id is the settings namespace |
+| Real, working code rather than a placeholder | `lib/` (host half, client half, 21 tools), `test/`, `scripts/` |
+| Official `@deepseek-ai/*` packages declared as `peerDependencies`, not `dependencies` | `package.json` — the package has **no runtime dependencies** |
+| A peer range that does not silently exclude prerelease harness builds | every range that names a prerelease also names its next tuple: `^0.2.0-rc.2 \|\| ^0.2.1-alpha.1` |
+| 1-8 screenshots declared in this repository | `screenshots.json` → `assets/`, with the `1-8`, in-repo, no-`..` rules asserted by `test/manifest.test.js` |
+| `repository`, `homepage` and `bugs` pointing at the listed repository | `package.json`, asserted by `test/manifest.test.js` |
+
+The submission itself is a single file in the list repository — `data/plugins/zhz8888__dsh-ios-simulator-helper.yml`, with `url: https://github.com/zhz8888/dsh-ios-simulator-helper`, `name: zhz8888/dsh-ios-simulator-helper` and a `description.en` that states only what the code does. Category `dev`: the plugin builds, runs and inspects iOS apps from the harness.
+
+Three things no repository can do for itself, and the only ones left:
+
+1. **Push this repository to `https://github.com/zhz8888/dsh-ios-simulator-helper`.** The list's CI fetches `package.json` from that exact URL, which is why `repository`, `homepage` and `bugs` here already name it. If the repository ends up under another owner or name, change those three fields (and the test that pins them) first.
+2. **Add the `dsh-plugin` topic** to the GitHub repository.
+3. **Wait a day.** The CI rejects repositories younger than 24 hours, so the pull request cannot be opened the same day the repository is created.
+
+Publishing to npm is optional and changes nothing about listing; if you do publish, the package's `repository` field already points back here, which is what links the two.
+
 ## Known limitations
 
 - **macOS only.** On any other host `ios_preflight` fails the `Host OS (macOS)` check, skips the remaining probes instead of producing meaningless spawn failures, and every `ios_*` tool refuses; the settings page keeps the notice at the top.
@@ -233,7 +281,7 @@ pnpm run link:dsh-deps        # offline development: symlink the local DSH @deep
 - `ios_logs` reads `log show` (no live stream), with a configurable and clamped window and length.
 - Swift-macro projects cannot be compiled when the caller is itself sandboxed (see `--no-macros`); DSH host-half code runs outside the bash sandbox, so normal use is unaffected.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.
-- **The settings page has not been eyeballed in a real GUI**: this delivery is the package plus install instructions, and nothing was written to the active profile. The render layer is covered by the real-React server-render tests, but spacing, dark theme and narrow-width wrapping still need a visual check after install.
+- **The settings page has been eyeballed once, in DSH Desktop**: the package was installed into the `desktop` profile from a local path, the page opened at Settings → iOS Simulator, and the four shots in `assets/` are that session, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are covered by the render tests, not by eye.
 - `@deepseek-ai/dsh-client-ui-primitives` is a browser bundler input (`*.module.css`, `simple-icons`, `zustand/vanilla`) that plain Node cannot import, so the render tests double that package; React itself and `react-dom/server` are real.
 - No credential handling: the plugin never reads or forwards key/token/secret environment variables.
 

@@ -13,11 +13,13 @@
 - [环境要求](#环境要求)
 - [安装](#安装)
 - [设置页面](#设置页面)
+- [截图](#截图)
 - [工具清单](#工具清单)
 - [Skill 与斜杠命令](#skill-与斜杠命令)
 - [与原插件的差异](#与原插件的差异)
 - [架构](#架构)
 - [开发与验证](#开发与验证)
+- [插件市场收录](#插件市场收录)
 - [已知限制](#已知限制)
 
 ## 环境要求
@@ -43,7 +45,7 @@ cd /path/to/dsh-ios-simulator-helper
 pnpm install
 ```
 
-`@deepseek-ai/schemastery` 是普通依赖；`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/cordis` 声明为 peer 依赖，由宿主提供。DSH 的兼容性闸门按 `peerDependencies` 里 `@deepseek-ai/dsh*` 的版本区间与运行时版本比对，不匹配会明确拒装。
+`@deepseek-ai/schemastery`、`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/cordis` 一律声明为 **peer 依赖**：这三个包由 DSH 宿主提供，插件只声明自己构建时对应的版本区间，避免再装进第二份。DSH 的兼容性闸门按 `peerDependencies` 里 `@deepseek-ai/dsh*` 的版本区间与运行时版本比对，不匹配会明确拒装。本包自身没有任何运行时依赖。
 
 ### 2. 装进 profile
 
@@ -116,6 +118,28 @@ cd ~/.dsh/profiles/<profile> && pnpm install
 ### 兼容旧配置
 
 原插件的 `userConfig`（`default_device`、`ui_backend`）与其环境变量 `IOS_SIM_DEFAULT_DEVICE`、`IOS_SIM_UI_BACKEND`、`IOS_SIM_PLUGIN_DATA` 都会作为回落生效（见上表最后一列），因此已有 ZCode / CI 配置无需改动。原插件的 `IOS_SIM_PACKAGE_ROOT` 只用于其 MCP 启动器定位插件自身，DSH 侧由包路径直接解析，不再需要。
+
+## 截图
+
+四张都是 DSH Desktop 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。
+
+**1. 模拟器与设备** —— 每次 `ios_*` 调用都会读取的字段：
+
+![DSH Desktop 里的 iOS 模拟器设置页：模拟器与设备分组，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](assets/settings-page-1-simulator-and-device.png)
+
+**2. UI 自动化与构建** —— `idb` 后端与其超时，接着是 `xcodebuild` 的配置、构建超时与额外参数：
+
+![滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](assets/settings-page-2-ui-automation-and-build.png)
+
+**3. 日志与输出** —— DerivedData 目录与代码签名开关，`ios_logs` 的窗口与字符上限，以及截图/日志/DerivedData 的落盘位置：
+
+![继续向下滚动：DerivedData 目录、构建时禁用代码签名、默认日志窗口与默认日志字符上限，以及数据目录与截图目录](assets/settings-page-3-logs-and-output.png)
+
+**4. 宿主检测与保存** —— macOS 判定与检测到的平台、两个检测按钮，以及保存按钮：
+
+![页面底部：宿主系统判定为「macOS —— 符合要求（darwin/arm64）」、检测环境与刷新模拟器按钮，以及保存按钮](assets/settings-page-4-host-check.png)
+
+`screenshots.json` 就在 `package.json` 旁边按这个顺序列出四张图，插件市场据此展示。`assets/` 只放这些精选截图；运行产物与验证截图不进仓库（见 `.gitignore`）。
 
 ## 工具清单
 
@@ -224,6 +248,30 @@ pnpm run link:dsh-deps        # 离线开发：把本机 DSH 的 @deepseek-ai �
 
 `smoke` 覆盖只有真机才能证明的部分：Xcode 探测、`simctl` 实际调用、生成工程能否编译、产物发现与 bundle id 解析、安装/启动/截图/日志/结束/关闭。
 
+## 插件市场收录
+
+本仓库按 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 的[贡献指南](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md)整理。指南的每一条要求与本仓库的对应位置：
+
+| 要求 | 满足位置 |
+|---|---|
+| `package.json` 声明 `dsh.bundle`（`dsh plugin add` 能否安装取决于它） | `dsh.bundle.patch` → `./cordis.patch.yml`，由 `test/manifest.test.js` 断言 |
+| `package.json` 旁边有 `cordis.patch.yml` 用于挂载插件 | `cordis.patch.yml`，一个 `insert` 行，行 id 即设置命名空间 |
+| 真实可用代码，而非占位 | `lib/`（host 半侧、client 半侧、21 个工具）、`test/`、`scripts/` |
+| 官方 `@deepseek-ai/*` 必须是 `peerDependencies`，不能是 `dependencies` | `package.json` —— 本包**没有任何运行时依赖** |
+| peer 区间不能静默排除 harness 的预发布版本 | 含预发布的区间都补齐下一段元组：`^0.2.0-rc.2 \|\| ^0.2.1-alpha.1` |
+| 在自己的仓库里声明 1-8 张截图 | `screenshots.json` → `assets/`；张数、是否在仓库内、禁止 `..` 由 `test/manifest.test.js` 断言 |
+| `repository`、`homepage`、`bugs` 指向被收录的仓库 | `package.json`，由 `test/manifest.test.js` 断言 |
+
+投稿本体是列表仓库里的单个文件 `data/plugins/zhz8888__dsh-ios-simulator-helper.yml`（`url` 与 `name` 用上面的仓库地址，`description.en` 只描述代码实际做的事）。分类选 `dev`：这个插件做的是构建、运行与检查 iOS 应用。
+
+剩下三件事只能由仓库之外完成：
+
+1. **把本仓库推送到 `https://github.com/zhz8888/dsh-ios-simulator-helper`。** 列表的 CI 会从这个确切地址读取 `package.json`，所以本仓库的 `repository` / `homepage` / `bugs` 已经写成它。若最终用别的 owner 或仓库名，先改这三个字段（以及断言它们的测试）。
+2. **给 GitHub 仓库加上 `dsh-plugin` topic。**
+3. **等满一天。** CI 会拒绝创建不足 24 小时的仓库，因此 PR 不能在建仓当天提交。
+
+发布到 npm 是可选项，不影响收录；一旦发布，包的 `repository` 字段已指回本仓库，这就是两者建立关联的依据。
+
 ## 已知限制
 
 - **仅支持 macOS**：非 macOS 上 `ios_preflight` 会把 `Host OS (macOS)` 标为失败并跳过其余探测（不做无意义的 spawn），所有 `ios_*` 工具直接拒绝；设置页顶部常驻提示。
@@ -232,7 +280,7 @@ pnpm run link:dsh-deps        # 离线开发：把本机 DSH 的 @deepseek-ai �
 - `ios_logs` 与原插件一样只做 `log show`（不做实时流），窗口与长度可配置且有上限。
 - Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；**在沙箱内调用本插件时这类工程无法编译**（真机集成测试因此提供 `--no-macros`）。DSH 宿主半侧的代码运行在 bash 沙箱之外，正常使用不受影响。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。
-- **设置页尚未在真实 GUI 中人工目视确认**：交付方式为「只交付包 + 安装说明」，未写入你正在使用的 profile。渲染层已由真实 React 服务端渲染测试覆盖，但视觉细节（间距、暗色主题、窄屏换行）需要装上后自行核对。
+- **设置页已在 DSH Desktop 里人工目视确认过一次**：把本包以本地路径装进 `desktop` profile，打开「设置 → iOS 模拟器」，`assets/` 里那四张按顺序就是那次的真实界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
 - `@deepseek-ai/dsh-client-ui-primitives` 是浏览器打包产物（依赖 `*.module.css`、`simple-icons`、`zustand/vanilla`），Node 无法直接 import，因此渲染测试对该包使用忠实替身；真实 React 与 `react-dom/server` 仍是真件。
 - 插件不触碰凭据：不读取、不转发任何含 key/token/secret 的环境变量。
 

@@ -31,11 +31,12 @@ import { status as uiStatus } from '../lib/providers/ui.js'
  * uses no Swift macros. The original template's `@State` and `#Preview` need
  * `swift-plugin-server`, which runs its macro expansion under `sandbox-exec`;
  * a caller that is *itself* sandboxed (the DSH bash tool, for example) cannot
- * start that nested sandbox, and the compile fails with
- * `sandbox-exec: sandbox_apply: Operation not permitted` before any of this
- * plugin's code is involved. The flag exists so the rest of the chain —
- * xcodebuild orchestration, product discovery, install, launch, screenshot,
- * logs, terminate, shutdown — can still be verified from a sandboxed shell.
+ * start that nested sandbox, and the first compile fails with
+ * `sandbox-exec: sandbox_apply: Operation not permitted`. `ios_build_app`
+ * recognizes exactly that signature and retries with
+ * `OTHER_SWIFT_FLAGS=-disable-sandbox`, so a plain `--with-simulator` run does
+ * build the real template; the flag stays for isolating macro expansion from
+ * this plugin's own orchestration.
  *
  * `--with-simulator` writes under the generated project when no `--data-dir` and
  * no `IOS_SIM_PLUGIN_DATA` are given, so the run stays inside a writable

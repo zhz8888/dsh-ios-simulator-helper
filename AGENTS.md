@@ -20,7 +20,7 @@ The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `l
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 100 tests, no Xcode and no simulator needed
+pnpm test                    # 101 tests, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount
 pnpm run verify:mount        # real Cordis Context + real ToolRuntime registry only
@@ -34,7 +34,7 @@ npm pack --dry-run --cache /tmp/npm-cache --registry https://registry.npmjs.org 
 
 `pnpm run check` is the definition of done. It runs the unit suites, `scripts/check-bundle.mjs` (cross-half consistency) and `scripts/verify-mount.mjs` (mounting on a real Cordis `Context` and the real `ToolRuntime`). Do not report work as finished on `pnpm test` alone.
 
-`smoke:simulator` accepts `--device <fragment>`, `--data-dir <path>`, `--keep` and `--no-macros`. `--no-macros` exists because Swift macro expansion needs `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed — that failure has nothing to do with this plugin.
+`smoke:simulator` accepts `--device <fragment>`, `--data-dir <path>`, `--keep` and `--no-macros`. Swift macro expansion needs `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed; `ios_build_app` now repairs that by itself — it retries once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry` — so `--no-macros` is only a way to isolate macro expansion from this plugin's own orchestration.
 
 ## Repository map
 
@@ -150,4 +150,4 @@ build: bump the version to 1.0.0
 - Add a runtime dependency: the harness provides the peers, and a second copy of a `@deepseek-ai/*` package is a bug.
 - Let a settings field exist on one side of the plugin only, or change the namespace without changing all four places.
 - Commit screenshots, logs, build output or scratch profiles.
-- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "100 tests".
+- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "101 tests".

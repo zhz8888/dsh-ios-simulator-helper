@@ -10,7 +10,7 @@ import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/p
 import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
 import { clampLimit, clampSeconds } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
-import { pickAppProduct } from '../lib/providers/build.js'
+import { macroSandboxDenied, pickAppProduct } from '../lib/providers/build.js'
 import { preflight } from '../lib/providers/preflight.js'
 import { status as uiStatus } from '../lib/providers/ui.js'
 
@@ -354,4 +354,23 @@ test('build product selection prefers the requested configuration', () => {
   assert.match(pickAppProduct(hits, 'Debug'), /Debug-iphonesimulator/)
   assert.match(pickAppProduct(hits, 'Profile'), /Debug-iphonesimulator/, 'an unknown configuration falls back to Debug')
   assert.equal(pickAppProduct([], 'Debug'), undefined)
+})
+
+/**
+ * The exact signature `swift-plugin-server` leaves behind when its nested
+ * sandbox cannot start; the build retries with `-disable-sandbox` only for it.
+ */
+test('only a nested macro sandbox failure triggers the sandbox retry', () => {
+  const denied = [
+    'sandbox-exec: sandbox_apply: Operation not permitted',
+    "ContentView.swift:4:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; '/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server' produced malformed response",
+    '** BUILD FAILED **',
+  ].join('\n')
+  assert.equal(macroSandboxDenied(denied), true)
+  // Each half alone is not enough: a real compile error, or a macro failure
+  // whose cause is something else, must be reported instead of retried.
+  assert.equal(macroSandboxDenied('sandbox-exec: sandbox_apply: Operation not permitted'), false)
+  assert.equal(macroSandboxDenied('error: cannot find type "Foo" in scope'), false)
+  assert.equal(macroSandboxDenied(''), false)
+  assert.equal(macroSandboxDenied(undefined), false)
 })

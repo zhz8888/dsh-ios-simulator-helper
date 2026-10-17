@@ -235,7 +235,7 @@ dsh-ios-simulator-helper/
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # 只装测试依赖（react、react-dom）
-pnpm test                     # 100 个测试（不需要 Xcode，不需要模拟器）
+pnpm test                     # 101 个测试（不需要 Xcode，不需要模拟器）
 pnpm run check                # 测试 + host/client 一致性闸门 + 真实 Cordis 挂载验证
 pnpm run verify:mount         # 真实 Cordis Context + 真实 ToolRuntime 注册表
 pnpm run smoke                # 只读真机探测：preflight / 模拟器 / 运行时 / 项目发现 / inventory
@@ -318,7 +318,7 @@ git rev-parse v1.0.0^{commit}   # 两者应打印同一个提交
 - `idb` 未安装时 `ios_ui_*` 不可用，`ios_ui_status` 会说明原因；`xcodebuildmcp` 只是保留值（与原插件的 `reservedBackends` 一致），尚未实现。
 - 原插件的 `ios_build_and_run` 会无条件打开 Simulator 窗口；本插件把它交给 `autoOpenSimulator` 设置（默认开，行为与原插件一致），`ios_build_app` / `ios_screenshot` 仍按原语义不主动开窗。窗口应用在 Xcode 25 及更早是 Simulator.app，在 Xcode 26 及以后是 Device Hub；窗口打不开时只在结果里报告（`opened: false` 与 `openWarning`），不会让 `simctl` 步骤失败。
 - `ios_logs` 与原插件一样只做 `log show`（不做实时流），窗口与长度可配置且有上限。
-- Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；**在沙箱内调用本插件时这类工程无法编译**（真机集成测试因此提供 `--no-macros`）。DSH 宿主半侧的代码运行在 bash 沙箱之外，正常使用不受影响。
+- Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；调用方本身已在沙箱内时这一步会失败，`ios_build_app` 会自动补上 `OTHER_SWIFT_FLAGS=-disable-sandbox` 重试一次，并在结果里标记 `macroSandboxRetry: true`。从未处于沙箱内的调用方不会触发重试。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。
 - **设置页已在 DSH Desktop 里人工目视确认过一次**：把插件装进 `desktop` profile，打开「设置 → iOS 模拟器」，`assets/` 里那四张按顺序就是那次的真实界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
 - `@deepseek-ai/dsh-client-ui-primitives` 是浏览器打包产物（依赖 `*.module.css`、`simple-icons`、`zustand/vanilla`），Node 无法直接 import，因此渲染测试对该包使用忠实替身；真实 React 与 `react-dom/server` 仍是真件。

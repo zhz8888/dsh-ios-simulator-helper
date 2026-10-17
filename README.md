@@ -91,18 +91,22 @@ Settings live in the profile, not in the package, so both commands leave them in
 
 The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The page reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness.
 
+The page opens with the plugin's full name, then one card per category, so the categories stay apart without a rule between every block. A field is the platform's own shape — label, then control, then hint — and a switch shows its state in the track alone. The metrics come from `@deepseek-ai/dsh-client-ui-primitives` (`settings-form/fields.module.css`), the field kit the built-in settings pages use, so this page sits beside them. The three timeouts are entered in whole seconds (`120`, `60`, `600`); the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
+
+Saving happens in a small pill that sticks to the bottom of the page and centres itself in the column: it is there while edits are staged (or a write is in flight, or one failed), names that state next to a status dot, and carries **Discard changes** and **Save** — the shared `Button` primitive, with save disabled while a draft is invalid. A draft that merely puts a control back to the value already in effect counts as no edit at all, so flipping a switch back really does leave the form clean. A confirmation toast reports a write that landed, and leaving the page discards staged edits.
+
 | Group | Field | Type | Default | Legacy env fallback | Notes |
 |---|---|---|---|---|---|
 | Simulator and device | `defaultDevice` | text (suggestions from this machine) | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | Device-name fragment used when a tool names no `udid`/`device`; falls back to the first available iPhone on a miss. |
 | | `defaultRuntime` | text (suggestions from installed runtimes) | empty | `IOS_SIM_DEFAULT_RUNTIME` | Runtime fragment such as `iOS-27`; empty matches any. A **preference, not a requirement**: a stale value widens the pool instead of erroring. |
 | | `autoBootSimulator` | switch | on | `IOS_SIM_AUTO_BOOT` | When off, tools fail instead of running `simctl boot` for a stopped target. |
 | | `autoOpenSimulator` | switch | on | `IOS_SIM_AUTO_OPEN` | Matches the original by opening the Simulator window (boot / show / open URL / build and run); off keeps everything headless. |
-| | `bootTimeoutMs` | integer | `120000` | `IOS_SIM_BOOT_TIMEOUT_MS` | Longest wait for one `simctl boot` / `bootstatus`. |
+| | `bootTimeoutSeconds` | integer | `120` | `IOS_SIM_BOOT_TIMEOUT_MS` (ms) | Longest wait for one `simctl boot` / `bootstatus`, in seconds. The legacy variable keeps its millisecond spelling and is converted. |
 | UI automation | `uiBackend` | select | `auto` | `IOS_SIM_UI_BACKEND` | `auto` probes for `idb`; `idb` requires it; `none` disables the UI tools; `xcodebuildmcp` is reserved. |
 | | `idbBinary` | text | `idb` | `IOS_SIM_IDB_BINARY` | Command name or absolute path of `idb`. |
-| | `uiTimeoutMs` | integer | `60000` | `IOS_SIM_UI_TIMEOUT_MS` | Longest runtime of one `idb` UI command. |
+| | `uiTimeoutSeconds` | integer | `60` | `IOS_SIM_UI_TIMEOUT_MS` (ms) | Longest runtime of one `idb` UI command, in seconds; the legacy variable is milliseconds. |
 | Build and DerivedData | `defaultConfiguration` | text | `Debug` | `IOS_SIM_CONFIGURATION` | Used when a tool names no `configuration`. |
-| | `buildTimeoutMs` | integer | `600000` | `IOS_SIM_BUILD_TIMEOUT_MS` | Longest runtime of one `xcodebuild build`. |
+| | `buildTimeoutSeconds` | integer | `600` | `IOS_SIM_BUILD_TIMEOUT_MS` (ms) | Longest runtime of one `xcodebuild build`, in seconds; the legacy variable is milliseconds. |
 | | `extraBuildArgs` | multiline | empty | `IOS_SIM_EXTRA_BUILD_ARGS` | One argument per line, `#` starts a comment; inserted after `-derivedDataPath` and before `build`. |
 | | `derivedDataDir` | text | empty | `IOS_SIM_DERIVED_DATA_DIR` | Empty uses `<data dir>/DerivedData/<project fingerprint>`. |
 | | `disableCodeSigning` | switch | on | `IOS_SIM_DISABLE_CODE_SIGNING` | The original always passed `CODE_SIGNING_ALLOWED=NO`; off lets Xcode decide. |
@@ -231,7 +235,7 @@ Four constraints shaped the layout:
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # test dependencies only (react, react-dom)
-pnpm test                     # 86 tests, no Xcode and no simulator required
+pnpm test                     # 98 tests, no Xcode and no simulator required
 pnpm run check                # tests + host/client consistency gate + real Cordis mount
 pnpm run verify:mount         # real Cordis Context + real ToolRuntime registry
 pnpm run smoke                # read-only probes on the real machine

@@ -91,18 +91,22 @@ dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # �
 
 设置命名空间 = profile patch 行 id = `ios-simulator-helper`（同时是 `dsh.name`）。页面通过 `ctx.configForms` 读写，因此具备暂存编辑、脏值检测、内联校验、乐观并发（revision）与「已覆盖/恢复默认」语义。
 
+页面顶部显示插件完整名称，随后每个分类是一张独立卡片，靠卡片边框区分，不必在每个区块之间加分隔线。每个字段沿用平台自带的「标签 → 控件 → 说明」结构，开关只靠滑块本身表示状态。度量取自 `@deepseek-ai/dsh-client-ui-primitives` 的 `settings-form/fields.module.css`——即内置设置页所用的表单套件，因此本页与它们并排也不显突兀。三个超时均以整秒填写（`120`、`60`、`600`）；旧的 `IOS_SIM_*_MS` 环境变量仍按毫秒读取，并自动换算为秒。
+
+保存由一条吸附在页面底部、居中的小药丸条负责：有暂存改动、写入进行中或写入失败时出现，状态点旁写明当前状态，并提供 **放弃改动** 与 **保存**（复用平台的 `Button` 组件；草稿不合法时保存按钮禁用）。只是把控件改回当前生效值的草稿不算改动——开关拨回去后表单会真正回到干净状态。写入成功由一条提示条确认；离开页面会放弃未保存的编辑。
+
 | 分组 | 设置项 | 类型 | 默认值 | 原插件环境变量回落 | 说明 |
 |---|---|---|---|---|---|
 | 模拟器与设备 | `defaultDevice` | 文本（建议来自本机模拟器） | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | 设备名片段；工具未指定 `udid`/`device` 时优先使用，找不到时退回第一个可用 iPhone |
 | | `defaultRuntime` | 文本（建议来自已装运行时） | 空 | `IOS_SIM_DEFAULT_RUNTIME` | 运行时名片段，例如 `iOS-27`；留空不限运行时。**偏好而非要求**：值过期时自动放宽而不是报错 |
 | | `autoBootSimulator` | 开关 | 开 | `IOS_SIM_AUTO_BOOT` | 关闭后，目标未启动时直接报错，不替你执行 `simctl boot` |
-| | `autoOpenSimulator` | 开关 | 开 | `IOS_SIM_AUTO_OPEN` | 与原插件一致地打开 Simulator 窗口（启动/显示/打开 URL/构建并运行）；关闭后只做 `simctl` 操作 |
-| | `bootTimeoutMs` | 整数 | `120000` | `IOS_SIM_BOOT_TIMEOUT_MS` | 单条 `simctl boot` / `bootstatus` 的最长等待 |
+| | `autoOpenSimulator` | 开关 | 开 | `IOS_SIM_AUTO_OPEN` | 与原插件一致地打开模拟器窗口（启动/显示/打开 URL/构建并运行）；关闭后只做 `simctl` 操作 |
+| | `bootTimeoutSeconds` | 整数 | `120` | `IOS_SIM_BOOT_TIMEOUT_MS`（毫秒） | 单条 `simctl boot` / `bootstatus` 的最长等待，单位为秒；旧变量保留毫秒写法并自动换算 |
 | UI 自动化 | `uiBackend` | 下拉 | `auto` | `IOS_SIM_UI_BACKEND` | `auto` 探测 idb；`idb` 强制要求；`none` 关闭 UI 工具；`xcodebuildmcp` 为保留值 |
 | | `idbBinary` | 文本 | `idb` | `IOS_SIM_IDB_BINARY` | idb 命令名或绝对路径 |
-| | `uiTimeoutMs` | 整数 | `60000` | `IOS_SIM_UI_TIMEOUT_MS` | 单次 idb UI 命令的最长运行时间 |
+| | `uiTimeoutSeconds` | 整数 | `60` | `IOS_SIM_UI_TIMEOUT_MS`（毫秒） | 单次 idb UI 命令的最长运行时间，单位为秒；旧变量为毫秒 |
 | 构建与 DerivedData | `defaultConfiguration` | 文本 | `Debug` | `IOS_SIM_CONFIGURATION` | 工具未指定 `configuration` 时使用 |
-| | `buildTimeoutMs` | 整数 | `600000` | `IOS_SIM_BUILD_TIMEOUT_MS` | 一次 `xcodebuild build` 的最长运行时间 |
+| | `buildTimeoutSeconds` | 整数 | `600` | `IOS_SIM_BUILD_TIMEOUT_MS`（毫秒） | 一次 `xcodebuild build` 的最长运行时间，单位为秒；旧变量为毫秒 |
 | | `extraBuildArgs` | 多行文本 | 空 | `IOS_SIM_EXTRA_BUILD_ARGS` | 每行一个参数，`#` 为注释；插在 `-derivedDataPath` 之后、`build` 之前 |
 | | `derivedDataDir` | 文本 | 空 | `IOS_SIM_DERIVED_DATA_DIR` | 留空用 `<数据目录>/DerivedData/<项目指纹>` |
 | | `disableCodeSigning` | 开关 | 开 | `IOS_SIM_DISABLE_CODE_SIGNING` | 原插件固定传 `CODE_SIGNING_ALLOWED=NO`；关闭后交给 Xcode 决定 |
@@ -231,7 +235,7 @@ dsh-ios-simulator-helper/
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # 只装测试依赖（react、react-dom）
-pnpm test                     # 86 个测试（不需要 Xcode，不需要模拟器）
+pnpm test                     # 98 个测试（不需要 Xcode，不需要模拟器）
 pnpm run check                # 测试 + host/client 一致性闸门 + 真实 Cordis 挂载验证
 pnpm run verify:mount         # 真实 Cordis Context + 真实 ToolRuntime 注册表
 pnpm run smoke                # 只读真机探测：preflight / 模拟器 / 运行时 / 项目发现 / inventory

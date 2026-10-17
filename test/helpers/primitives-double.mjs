@@ -250,6 +250,18 @@ export function StateDot({ state, size }) {
   return React.createElement('span', { 'data-state': state, 'data-size': size })
 }
 
+/**
+ * A transient banner.
+ *
+ * The shipped one portals into the body and owns its own hold, fade and teardown;
+ * the double only reports what it was asked to say, because a server render
+ * observes a single snapshot and has no timers to advance.
+ */
+export function Toast({ text, tone, onDone }) {
+  void onDone
+  return React.createElement('span', { 'data-toast': tone ?? 'plain', role: 'alert' }, text)
+}
+
 export default {
   SettingsForm,
   SettingsFormModel,
@@ -259,4 +271,5 @@ export default {
   Button,
   Tag,
   StateDot,
+  Toast,
 }

@@ -20,7 +20,7 @@ The plugin page shows **iOS Simulator** / **iOS 模拟器** from `locale/`, not 
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 86 tests, no Xcode and no simulator needed
+pnpm test                    # 98 tests, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount
 pnpm run verify:mount        # real Cordis Context + real ToolRuntime registry only
@@ -76,7 +76,7 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 - **A tool** — add it in `lib/tools/index.js` with an argument and result schema. The count is pinned in five places, so the gate fails until all agree: `test/host.test.js` and `scripts/verify-mount.mjs` (both `21`), the `description` of `locale/en.json` and `locale/zh.json`, and the README tool table. `verify-mount.mjs` also dispatches the read-only tools through the real registry and validates their JSON.
 - **A settings field** — both field tables, then every place the count is pinned: `test/settings.test.js` ("17 fields in 5 groups"), `test/client-render.test.js` (field count and registration order), `scripts/verify-mount.mjs` (volatile count), and the README settings table. The gate fails on drift.
 - **A provider** — keep the ported behaviour; the parsers are covered by `test/providers.test.js`. Anything that needs a Mac belongs in `scripts/smoke.mjs`, not in `test/`.
-- **The settings page** — `test/client-render.test.js` renders it with real React and `react-dom/server` in four host scenarios (macOS, Linux, Windows, undetectable) and asserts every dictionary key resolves.
+- **The settings page** — `test/client-render.test.js` renders it with real React and `react-dom/server` in four host scenarios (macOS, Linux, Windows, undetectable), drives the real form model into the dirty and invalid states the action bar reacts to, and asserts every dictionary key resolves.
 - **Testing the plugin by hand** — install this directory into a scratch profile (`dsh plugin --profile <scratch> add /absolute/path/to/dsh-ios-simulator-helper`), or through the DSH Desktop plugin manager. Never leave a scratch profile in the repository.
 
 ## Code style
@@ -149,4 +149,4 @@ build: bump the version to 1.0.0
 - Add a runtime dependency: the harness provides the peers, and a second copy of a `@deepseek-ai/*` package is a bug.
 - Let a settings field exist on one side of the plugin only, or change the namespace without changing all four places.
 - Commit screenshots, logs, build output or scratch profiles.
-- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "86 tests".
+- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "98 tests".

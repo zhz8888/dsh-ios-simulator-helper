@@ -37,12 +37,12 @@ const LIVE_VALUES = {
   defaultRuntime: '',
   autoBootSimulator: true,
   autoOpenSimulator: true,
-  bootTimeoutMs: 120000,
+  bootTimeoutSeconds: 120,
   uiBackend: 'auto',
   idbBinary: 'idb',
-  uiTimeoutMs: 60000,
+  uiTimeoutSeconds: 60,
   defaultConfiguration: 'Debug',
-  buildTimeoutMs: 600000,
+  buildTimeoutSeconds: 600,
   extraBuildArgs: '',
   derivedDataDir: '',
   disableCodeSigning: true,
@@ -100,7 +100,7 @@ function fakeConfigForm() {
     status: 'ready',
     value: { ...LIVE_VALUES },
     base: { ...LIVE_VALUES },
-    user: { bootTimeoutMs: 120000 },
+    user: { bootTimeoutSeconds: 120 },
     revision: 3,
     writable: true,
     mode: 'host',
@@ -267,7 +267,44 @@ if (registered.component === undefined) {
     }
     setNavigator(NAVIGATORS.macos)
     report.registered = { id: options.id, order: options.order }
+
+    // The staged-form states the action bar reacts to. A server render observes one
+    // snapshot, so each state is produced by driving the real model and rendering
+    // again: a draft its spec refuses, a valid one, then a set of drafts that all
+    // spell the value already in effect — a switch flipped back, a text field
+    // retyped as it was, and a profile override left untouched.
+    try {
+      props.edit('bootTimeoutSeconds', 'soon')
+      report.variants.macosInvalid = renderToStaticMarkup(React.createElement(component, props))
+      props.edit('bootTimeoutSeconds', '90')
+      report.variants.macosDirty = renderToStaticMarkup(React.createElement(component, props))
+      props.discard()
+      props.edit('autoBootSimulator', 'true')
+      props.edit('defaultDevice', 'iPhone 17')
+      props.edit('bootTimeoutSeconds', '120')
+      report.variants.macosReverted = renderToStaticMarkup(React.createElement(component, props))
+      props.discard()
+    } catch (error) {
+      report.failures.push(`staged render threw: ${error.stack ?? error.message}`)
+    }
   }
+}
+
+// ── the action-bar state machine, independent of the render ─────────────────
+try {
+  const api = exported.ACTION_BAR_API
+  const clean = { dirty: false, invalid: false, saving: false, failed: false }
+  const identity = (key) => key
+  report.actionBar = {
+    clean: api.actionBarState(clean, identity),
+    dirty: api.actionBarState({ ...clean, dirty: true }, identity),
+    invalid: api.actionBarState({ ...clean, dirty: true, invalid: true }, identity),
+    saving: api.actionBarState({ ...clean, dirty: true, saving: true }, identity),
+    failed: api.actionBarState({ ...clean, failed: true }, identity),
+    failedDraft: api.actionBarState({ ...clean, dirty: true, failed: true }, identity),
+  }
+} catch (error) {
+  report.failures.push(`ACTION_BAR_API threw: ${error.message}`)
 }
 
 process.stdout.write(`${JSON.stringify(report)}\n`)

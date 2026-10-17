@@ -52,12 +52,12 @@ test('defaults are used when nothing is configured', () => {
   assert.equal(settings.defaultRuntime, '')
   assert.equal(settings.autoBootSimulator, true)
   assert.equal(settings.autoOpenSimulator, true)
-  assert.equal(settings.bootTimeoutMs, 120000)
+  assert.equal(settings.bootTimeoutSeconds, 120)
   assert.equal(settings.uiBackend, 'auto')
   assert.equal(settings.idbBinary, 'idb')
-  assert.equal(settings.uiTimeoutMs, 60000)
+  assert.equal(settings.uiTimeoutSeconds, 60)
   assert.equal(settings.defaultConfiguration, 'Debug')
-  assert.equal(settings.buildTimeoutMs, 600000)
+  assert.equal(settings.buildTimeoutSeconds, 600)
   assert.equal(settings.extraBuildArgs, '')
   assert.equal(settings.derivedDataDir, '')
   assert.equal(settings.disableCodeSigning, true)
@@ -70,6 +70,8 @@ test('defaults are used when nothing is configured', () => {
 test('the original plugin env variables still configure it', () => {
   // IOS_SIM_DEFAULT_DEVICE / IOS_SIM_UI_BACKEND / IOS_SIM_PLUGIN_DATA are what
   // the ZCode plugin read, so an existing setup must keep working untouched.
+  // The three timeout variables keep their original `_MS` spelling and are
+  // converted: 45000 ms is the 45 seconds the setting now stores.
   const settings = readSettings({}, {
     IOS_SIM_DEFAULT_DEVICE: 'iPad mini',
     IOS_SIM_UI_BACKEND: 'none',
@@ -81,7 +83,15 @@ test('the original plugin env variables still configure it', () => {
   assert.equal(settings.uiBackend, 'none')
   assert.equal(settings.dataDir, '/tmp/ios-sim-data')
   assert.equal(settings.autoOpenSimulator, false)
-  assert.equal(settings.bootTimeoutMs, 45000)
+  assert.equal(settings.bootTimeoutSeconds, 45)
+})
+
+test('a millisecond env value converts to whole seconds, never below one', () => {
+  const seconds = (raw) => readSettings({}, { IOS_SIM_BUILD_TIMEOUT_MS: raw }).buildTimeoutSeconds
+  assert.equal(seconds('600000'), 600)
+  assert.equal(seconds('1500'), 2, 'the nearest second wins')
+  assert.equal(seconds('400'), 1, 'a sub-second timeout still has to be positive')
+  assert.equal(seconds('soon'), 600, 'an unusable value falls back to the default')
 })
 
 test('a volatile reference is read fresh on every projection', () => {
@@ -109,11 +119,11 @@ test('an out-of-range select value falls back to the declared default', () => {
 
 test('a malformed number falls back instead of reaching the providers', () => {
   const settings = readSettings(
-    liveConfig({ bootTimeoutMs: 'soon', buildTimeoutMs: -5, logSeconds: 12.5, logLimit: 0 }),
+    liveConfig({ bootTimeoutSeconds: 'soon', buildTimeoutSeconds: -5, logSeconds: 12.5, logLimit: 0 }),
     {},
   )
-  assert.equal(settings.bootTimeoutMs, 120000)
-  assert.equal(settings.buildTimeoutMs, 600000)
+  assert.equal(settings.bootTimeoutSeconds, 120)
+  assert.equal(settings.buildTimeoutSeconds, 600)
   assert.equal(settings.logSeconds, 120)
   assert.equal(settings.logLimit, 20000)
 })

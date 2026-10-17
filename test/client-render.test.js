@@ -73,10 +73,47 @@ test('every field group is rendered with its heading and hint', () => {
 test('the controls carry the values the host serves, not placeholders', () => {
   const markup = report.variants.macos
   assert.match(markup, /value="iPhone 17"/)
-  assert.match(markup, /value="120000"/)
+  assert.match(markup, /value="120"/)
   assert.match(markup, /role="switch" aria-checked="true"/)
   assert.match(markup, /<option value="auto" selected="">/)
   assert.match(markup, /<option value="idb">/)
+})
+
+test('the page is headed by the plugin name, not only by the nav label', () => {
+  assert.match(report.variants.macos, /<h2 class="ismh_title">iOS Simulator Helper<\/h2>/)
+})
+
+test('every category is its own card', () => {
+  // Five field groups plus the diagnostics card: the card outline is what
+  // separates the categories, so each one must keep carrying it.
+  const cards = report.variants.macos.match(/class="ismh_group"/g) ?? []
+  assert.equal(cards.length, 6)
+})
+
+test('a switch does not repeat its state as on/off text', () => {
+  const markup = report.variants.macos
+  assert.ok(!/>on<\/span>/.test(markup), 'the track already shows the state')
+  assert.ok(!/>off<\/span>/.test(markup))
+  assert.match(markup, /role="switch" aria-checked="true"/)
+})
+
+test('the backend select shows translated text while storing the raw value', () => {
+  const markup = report.variants.macos
+  assert.match(markup, /<option value="auto" selected="">Auto-detect \(recommended\)<\/option>/)
+  assert.match(markup, /<option value="idb">Require idb<\/option>/)
+})
+
+test('every field is a stacked label/control/hint block', () => {
+  const blocks = report.variants.macos.split('class="ismh_field"').slice(1)
+  assert.equal(blocks.length, 17, 'one block per field')
+  for (const block of blocks) {
+    const label = block.indexOf('ismh_label')
+    const at = [block.indexOf('ismh_control'), block.indexOf('role="switch"')].filter((index) => index >= 0)
+    const control = Math.min(...at)
+    const hint = block.indexOf('ismh_hint')
+    assert.ok(label >= 0 && control > label, 'the label comes before its control')
+    assert.ok(hint > control, 'the hint comes after the control')
+  }
 })
 
 test('all 17 fields are rendered, in the host schema order', () => {
@@ -130,8 +167,63 @@ test('the host check, diagnostics, discovery and save controls are present', () 
   const markup = report.variants.macos
   assert.match(markup, /Run diagnostic/)
   assert.match(markup, /Refresh simulators and runtimes/)
-  assert.match(markup, />Save</)
   assert.match(markup, /Host check, diagnostics and discovery/)
+})
+
+test('the save control is an action bar, absent while nothing is staged', () => {
+  const markup = report.variants.macos
+  assert.ok(!/ismh_actions/.test(markup), 'a clean form shows no action bar')
+  assert.ok(!/>Save</.test(markup), 'and therefore no save button')
+})
+
+test('a staged edit shows the bar with its discard and save buttons', () => {
+  const markup = report.variants.macosDirty
+  assert.match(markup, /class="ismh_actions"/)
+  assert.match(markup, /Unsaved changes/)
+  assert.match(markup, /data-state="warning"/)
+  assert.match(markup, /data-variant="ghost"[^>]*>Discard changes</)
+  const save = /<button[^>]*data-variant="primary"[^>]*>/.exec(markup)?.[0]
+  assert.ok(save !== undefined && !save.includes('disabled'), 'a valid draft may be saved')
+})
+
+test('an invalid draft turns the bar into an error and blocks the save', () => {
+  const markup = report.variants.macosInvalid
+  assert.match(markup, /class="ismh_actions ismh_actionsError"/)
+  assert.match(markup, /One value is invalid; fix it before saving/)
+  assert.match(markup, /data-state="error"/)
+  const save = /<button[^>]*data-variant="primary"[^>]*>/.exec(markup)?.[0]
+  assert.ok(save?.includes('disabled'), 'save must be disabled while a draft is invalid')
+})
+
+test('a draft that reverts to the value in effect stops counting as an edit', () => {
+  const clean = report.variants.macos
+  const reverted = report.variants.macosReverted
+  assert.ok(!/ismh_actions/.test(reverted), 'the bar closes once no save would write anything')
+  const badges = (markup) => (markup.match(/data-tone="outline"/g) ?? []).length
+  // The fixture profile keeps one override of its own, so one badge is expected in
+  // both renders: the reverted drafts (a switch, a text field, and that override's
+  // own value) must not add another.
+  assert.equal(badges(clean), 1)
+  assert.equal(badges(reverted), 1, 'a reverted draft must not raise the overridden badge')
+})
+
+test('the bar state machine covers clean, pending, blocked and failed', () => {
+  const bar = report.actionBar
+  assert.equal(bar.clean, null, 'a clean form has nothing to say')
+  assert.deepEqual(bar.dirty, { tone: 'pending', message: 'pendingWrite', canSave: true, canDiscard: true })
+  assert.equal(bar.saving.tone, 'pending')
+  assert.equal(bar.saving.canSave, false, 'a write in flight must not be started twice')
+  assert.equal(bar.saving.canDiscard, false, 'nor discarded while it is being written')
+  assert.equal(bar.invalid.tone, 'error')
+  assert.equal(bar.invalid.canSave, false, 'an invalid draft must not be savable')
+  assert.deepEqual(bar.failed, { tone: 'error', message: 'writeFailed', canDiscard: true, canSave: false })
+  assert.equal(bar.failedDraft.canSave, true, 'a failed write with valid edits may be retried')
+})
+
+test('no confirmation is shown before a write lands', () => {
+  for (const [host, markup] of Object.entries(report.variants)) {
+    assert.ok(!markup.includes('data-toast'), `the ${host} page must not report a save that never happened`)
+  }
 })
 
 test('no unresolved dictionary key leaks into the markup', () => {

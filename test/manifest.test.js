@@ -60,11 +60,21 @@ test('a plugin list can read a localized display name and description', () => {
       JSON.parse(readFileSync(path.join(ROOT, 'locale', `${language}.json`), 'utf8')),
     ]),
   )
-  assert.equal(dictionaries.en.meta.title, 'iOS Simulator')
-  assert.equal(dictionaries.zh.meta.title, 'iOS 模拟器')
+  assert.equal(dictionaries.en.meta.title, 'iOS Simulator Helper')
+  assert.equal(dictionaries.zh.meta.title, 'iOS 模拟器助手')
   for (const [language, dictionary] of Object.entries(dictionaries)) {
     assert.ok(dictionary.meta.description.length > 0, `${language} needs a description`)
     assert.ok(!dictionary.meta.title.includes('dsh-'), `${language} must not show the package name`)
+    // The title names this plugin, not the Apple product it drives: the role
+    // noun has to survive in every language, or the plugin reads as the
+    // simulator itself.
+    assert.match(dictionary.meta.title, /（?Helper|助手/, `${language} must name the helper, not the simulator`)
+    // It is not Apple's plugin either, and every language has to say so.
+    assert.match(
+      dictionary.meta.description,
+      /Not affiliated with Apple|与 Apple 无隶属关系/,
+      `${language} needs the non-affiliation line`,
+    )
   }
 })
 
@@ -119,7 +129,7 @@ test('every module the host imports is inside the published file set', () => {
   const shipped = shippedPaths(manifest.files, ROOT)
   const required = [
     'cordis.patch.yml',
-    'ios.svg',
+    'ios-simulator.png',
     'lib/index.js',
     'lib/client.js',
     'lib/settings.js',
@@ -141,38 +151,38 @@ test('every module the host imports is inside the published file set', () => {
   }
 })
 
-test('the declared plugin icon is a clean, square SVG and the old one is gone', () => {
-  // The icon is the one asset a marketplace or plugin list renders verbatim, so
-  // its shape is part of the contract: 36x36 like every shipped DSH icon, no
-  // iconfont wrapper, and an accessible title.
-  assert.equal(manifest.icon, './ios.svg')
-  const icon = readFileSync(path.join(ROOT, 'ios.svg'), 'utf8')
-  assert.match(icon, /viewBox="0 0 36 36"/)
-  assert.match(icon, /<title>/)
-  assert.ok(!icon.includes('<!DOCTYPE'), 'the iconfont DOCTYPE must be gone')
-  assert.ok(!/\sp-id=/.test(icon), 'iconfont p-id attributes must be gone')
-  assert.ok(!/\sclass="icon"/.test(icon), 'the iconfont class must be gone')
-  assert.ok(existsSync(path.join(ROOT, 'ios.svg')), 'the icon the manifest names must exist')
-  assert.ok(!existsSync(path.join(ROOT, 'icon.svg')), 'the superseded icon must be removed')
+test('the declared plugin icon is the artwork, inside the loader limits', () => {
+  // The icon is the one asset a plugin list or marketplace renders verbatim.
+  // `dsh-app-boot` admits SVG, PNG, JPEG and WebP only, resolves the path inside
+  // the manifest directory, and refuses anything over 256 KiB — so the format,
+  // the square frame and the size budget are all part of the contract.
+  assert.equal(manifest.icon, './ios-simulator.png')
+  const file = path.join(ROOT, 'ios-simulator.png')
+  assert.ok(existsSync(file), 'the icon the manifest names must exist')
+  const bytes = readFileSync(file)
+  assert.deepEqual(
+    [...bytes.subarray(0, 8)],
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+    'the icon must be a PNG',
+  )
+  const width = bytes.readUInt32BE(16)
+  const height = bytes.readUInt32BE(20)
+  assert.equal(width, height, 'a plugin icon renders in a square seat')
+  assert.ok(width >= 128, `too small to stay sharp at 36px: ${width}`)
+  assert.ok(bytes.length <= 256 * 1024, 'dsh-app-boot refuses an icon over 256 KiB')
+  assert.ok(!existsSync(path.join(ROOT, 'ios.svg')), 'the superseded icon must be removed')
+  assert.ok(!existsSync(path.join(ROOT, 'icon.svg')), 'the superseded iconfont must stay gone')
 })
 
-test('the icon keeps the original ink and inverts it exactly for dark mode', () => {
-  // `dsh-app-boot` serves the icon's raw bytes as an exported resource, so the
-  // file is rendered as an image and cannot inherit `currentColor`: it has to
-  // carry its own adaptivity. `color-scheme: light dark` is what lets a
-  // supporting engine resolve the query from the embedding element instead of
-  // only from the operating system.
-  const icon = readFileSync(path.join(ROOT, 'ios.svg'), 'utf8')
-  assert.match(icon, /color-scheme:\s*light dark/, 'the icon must declare both schemes')
-  assert.match(icon, /@media \(prefers-color-scheme: dark\)/, 'the icon must react to the dark scheme')
-
-  const light = /\.ismh-ink\s*\{\s*fill:\s*(#[0-9a-f]{6})/i.exec(icon)?.[1]
-  const dark = /prefers-color-scheme:\s*dark\)\s*\{\s*\.ismh-ink\s*\{\s*fill:\s*(#[0-9a-f]{6})/i.exec(icon)?.[1]
-  assert.equal(light?.toLowerCase(), '#2c2c2c', 'the light ink must stay the glyph original colour')
-  const inverse = `#${[0, 2, 4]
-    .map((offset) => (255 - Number.parseInt(light.slice(1 + offset, 3 + offset), 16)).toString(16).padStart(2, '0'))
-    .join('')}`
-  assert.equal(dark?.toLowerCase(), inverse, 'the dark ink must be the exact inverse of the light ink')
+test('the icon paints its own background, so it needs no light/dark variant', () => {
+  // The superseded icon was a transparent monochrome wordmark and had to invert
+  // itself for the dark theme. The artwork shipped now is opaque: it carries its
+  // own background and reads the same on either theme, so an alpha channel here
+  // would mean a half-transparent tile instead. The IHDR holds those two fields
+  // at fixed offsets, which makes this checkable without an image decoder.
+  const bytes = readFileSync(path.join(ROOT, 'ios-simulator.png'))
+  assert.equal(bytes.readUInt8(24), 8, 'the IHDR bit depth must stay 8')
+  assert.equal(bytes.readUInt8(25), 2, 'the IHDR colour type must stay truecolour without alpha')
 })
 
 test('the repository fields name the public repo a plugin list links to', () => {

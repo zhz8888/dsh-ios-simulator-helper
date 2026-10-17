@@ -41,6 +41,9 @@ yarn-error.log*
 *.temp
 .cache/
 /*.png
+# ...except the plugin icon: `package.json` names it and `dsh-app-boot` resolves
+# it inside the manifest directory, so it has to sit at the package root.
+!/ios-simulator.png
 
 # --- editors and IDEs -----------------------------------------------------
 .vscode/

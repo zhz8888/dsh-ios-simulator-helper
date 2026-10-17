@@ -14,7 +14,7 @@ Working notes for coding agents in this repository. Everything below is specific
 | Host | macOS only, with full Xcode. Every `ios_*` tool refuses in one sentence elsewhere. |
 | Package | Two halves: `lib/index.js` (host, Cordis) and `lib/client.js` (browser bundle for the settings page). |
 
-The plugin page shows **iOS Simulator** / **iOS 模拟器** from `locale/`, not the package name. The settings namespace, the `cordis.patch.yml` row id and the route prefix are all `ios-simulator-helper`.
+The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/`, not the package name — the title names this plugin, not the Apple product it drives, and the descriptions carry the non-affiliation line. The settings namespace, the `cordis.patch.yml` row id and the route prefix are all `ios-simulator-helper`.
 
 ## Commands
 
@@ -41,7 +41,7 @@ npm pack --dry-run --cache /tmp/npm-cache --registry https://registry.npmjs.org 
 ```
 package.json          version, the dsh manifest (bundle patch + client), peer ranges, files whitelist
 cordis.patch.yml      the one `insert` row that mounts the host half
-ios.svg               plugin icon; 36x36, carries its own dark-mode inversion (test asserts the shape)
+ios-simulator.png     plugin icon: the ZCode plugin's artwork, cropped to its content; opaque square PNG (test asserts the shape and the loader limits)
 locale/en.json        plugin-page title/description; its presence is what enables the other languages
 locale/zh.json        the Simplified Chinese pair
 lib/index.js          host half: tools, skill, command, the three Fetch routes, settings policy

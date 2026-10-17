@@ -12,7 +12,7 @@ A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0`
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
 - 17 settings fields in 5 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
 - The settings page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every `ios_*` tool refuses in one clear sentence instead of failing with `spawn xcrun ENOENT`.
-- Published as `@zhz8888/dsh-ios-simulator-helper`, and the plugin page shows the name from `locale/en.json` and `locale/zh.json` — **iOS Simulator** / **iOS 模拟器** — rather than the raw package name.
+- Published as `@zhz8888/dsh-ios-simulator-helper`, and the plugin page shows the name from `locale/en.json` and `locale/zh.json` — **iOS Simulator Helper** / **iOS 模拟器助手** — rather than the raw package name. The title names this helper rather than Apple's simulator, and both descriptions say the plugin is unofficial and not affiliated with Apple.
 
 ## Quick start
 
@@ -204,7 +204,7 @@ Keeping direct spawns is a deliberate trade-off: `xcodebuild`, `simctl` and `idb
 dsh-ios-simulator-helper/
 ├── package.json            # dsh.bundle.patch, dsh.client, peer dependencies (compatibility gate)
 ├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: '@zhz8888/dsh-ios-simulator-helper' }]
-├── ios.svg                 # plugin icon: iOS wordmark in its original colour, inverted in dark mode
+├── ios-simulator.png       # plugin icon: the artwork the ZCode ios-simulator plugin ships, cropped and downscaled
 ├── locale/en.json          # plugin-page name and description (English; its presence is what enables every other language)
 ├── locale/zh.json          # the Simplified Chinese pair
 ├── README.md               # this file (English, primary)

@@ -44,9 +44,11 @@ this file. Material ported from that plugin:
   - the generated SwiftUI starter project — `App.swift`, `ContentView.swift`
     and the Xcode 14-compatible `project.pbxproj` — kept verbatim;
   - the `ios-dev` skill text, adapted for DSH;
-  - the plugin icon (`ios.svg`), which is the iOS wordmark supplied for this
-    project, refitted to DSH's 36x36 icon frame and made light/dark adaptive
-    (the glyph's original colour, its exact inverse under a dark scheme).
+  - the plugin icon (`ios-simulator.png`), which is that plugin's marketplace
+    artwork (published at
+    `https://cdn-zcode.z.ai/zcode/official-plugin/assets/ios-simulator/icon.png`),
+    kept as published apart from cropping its flat margin and downscaling it to
+    the size DSH renders.
 
 Everything else — the DSH host half, the browser half and its settings page,
 the macOS-only host gate, the settings schema, the test suite and the scripts —

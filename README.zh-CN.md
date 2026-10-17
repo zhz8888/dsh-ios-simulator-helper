@@ -12,7 +12,7 @@
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
 - 设置页 5 组 17 个字段，全部实时生效；空值按「设置页 → 原插件环境变量 → 内置默认值」顺序回落。
 - 设置页会检测宿主系统：**非 macOS 时直接提示该插件仅支持 macOS**，且所有 `ios_*` 工具都会以一句话拒绝执行，而不是抛出 `spawn xcrun ENOENT`。
-- npm 包名为 `@zhz8888/dsh-ios-simulator-helper`，插件页显示的名称由 `locale/en.json` 与 `locale/zh.json` 提供——英文 **iOS Simulator**、中文 **iOS 模拟器**——而不是裸包名。
+- npm 包名为 `@zhz8888/dsh-ios-simulator-helper`，插件页显示的名称由 `locale/en.json` 与 `locale/zh.json` 提供——英文 **iOS Simulator Helper**、中文 **iOS 模拟器助手**——而不是裸包名。名称指的是这个助手本身，而不是 Apple 的模拟器；两份描述都注明插件为非官方、与 Apple 无隶属关系。
 
 ## 快速上手
 
@@ -204,7 +204,7 @@ dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # �
 dsh-ios-simulator-helper/
 ├── package.json            # dsh.bundle.patch、dsh.client、peer 依赖（兼容性闸门）
 ├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: '@zhz8888/dsh-ios-simulator-helper' }]
-├── ios.svg                 # 插件图标：iOS 字标，沿用原版取色，深色模式自适应反色
+├── ios-simulator.png       # 插件图标：ZCode ios-simulator 插件所用的那张图，已裁边并缩放
 ├── locale/en.json          # 插件页名称与简介（英文；它的存在与否决定其他语言文件是否生效）
 ├── locale/zh.json          # 对应的简体中文
 ├── README.md               # 英文版（默认）

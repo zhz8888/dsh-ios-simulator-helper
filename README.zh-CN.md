@@ -129,23 +129,23 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## 截图
 
-四张都是 DSH Desktop 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。它们拍于 1.1.0 的卡片式布局与底部操作条之前，展示的是同一批控件的旧排版；下文提到的保存按钮，如今是页面底部的操作条。
+四张都是 DSH Desktop 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。展示的是 1.1.0 的卡片式布局与按整秒填写的超时；保存操作条只在有暂存改动时出现，因此这几张里看不到它。截图时窗口用的是中文界面，分区标题为中文，字段名两种语言一致。
 
 **1. 模拟器与设备** —— 每次 `ios_*` 调用都会读取的字段：
 
-![DSH Desktop 里的 iOS 模拟器设置页：模拟器与设备分组，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
+![DSH Desktop 里的 iOS 模拟器设置页：模拟器与设备卡片，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI 自动化与构建** —— `idb` 后端与其超时，接着是 `xcodebuild` 的配置、构建超时与额外参数：
 
 ![滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. 日志与输出** —— DerivedData 目录与代码签名开关，`ios_logs` 的窗口与字符上限，以及截图/日志/DerivedData 的落盘位置：
+**3. 构建尾部与日志** —— 额外 `xcodebuild` 参数、DerivedData 目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限：
 
-![继续向下滚动：DerivedData 目录、构建时禁用代码签名、默认日志窗口与默认日志字符上限，以及数据目录与截图目录](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![继续向下滚动：额外 xcodebuild 参数、DerivedData 目录、构建时禁用代码签名，以及默认日志窗口与默认日志字符上限](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
-**4. 宿主检测与保存** —— macOS 判定与检测到的平台、两个检测按钮，以及保存按钮：
+**4. 输出目录与宿主检测** —— 截图/日志/DerivedData 的落盘位置，然后是 macOS 判定与两个检测按钮：
 
-![页面底部：宿主系统判定为「macOS —— 符合要求（darwin/arm64）」、检测环境与刷新模拟器按钮，以及保存按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
+![页面底部：数据目录与截图目录，以及宿主系统判定为「macOS —— 符合要求（darwin/arm64）」与检测环境、刷新模拟器两个按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` 就在仓库里的 `package.json` 旁边按这个顺序列出四张图，插件市场据此展示。
 
@@ -206,7 +206,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 - `ios_logs` 与原插件一样只做 `log show`（不做实时流），窗口与长度可配置且有上限。
 - Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；调用方本身已在沙箱内时这一步会失败，`ios_build_app` 会自动补上 `OTHER_SWIFT_FLAGS=-disable-sandbox` 重试一次，并在结果里标记 `macroSandboxRetry: true`。从未处于沙箱内的调用方不会触发重试。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。
-- **设置页已在 DSH Desktop 里人工目视确认过一次**：把插件装进 `desktop` profile，打开「设置 → iOS 模拟器」，`assets/` 里那四张按顺序就是那次的真实界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
+- **设置页只在 DSH Desktop 里做过人工目视确认**：插件装在 `desktop` profile，`assets/` 里那四张按顺序就是最近一次手动检查的界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
 - 插件不触碰凭据：不读取、不转发任何含 key/token/secret 的环境变量。
 
 ## 版本与发布

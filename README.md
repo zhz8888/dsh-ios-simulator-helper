@@ -129,23 +129,23 @@ The original plugin's `userConfig` (`default_device`, `ui_backend`) and its envi
 
 ## Screenshots
 
-All four are the live page in DSH Desktop, in the order you scroll it — nothing is mocked up. They were captured before the card layout and the sticky action bar that 1.1.0 ships, so they show the same controls in the earlier arrangement, and the save button these captions mention is now the page's action bar.
+All four are the live page in DSH Desktop, in the order you scroll it — nothing is mocked up. They show the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the section headings are Chinese while every field name is the same in both languages.
 
 **1. Simulator and device** — the fields every `ios_*` call reads:
 
-![The iOS Simulator settings page in DSH Desktop: the simulator-and-device group with default device, default runtime, auto boot, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
+![The iOS Simulator settings page in DSH Desktop: the simulator-and-device card with the default device, default runtime, auto boot, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI automation and builds** — the `idb` backend and its timeout, then the `xcodebuild` configuration, build timeout and extra arguments:
 
 ![The page scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. Logs and output** — the DerivedData directory and code-signing switch, then the `ios_logs` window and character limit, then where screenshots, logs and DerivedData land:
+**3. Build tail and logs** — the extra `xcodebuild` arguments, the DerivedData directory and the code-signing switch, then the `ios_logs` window and character limit:
 
-![The page scrolled further: DerivedData directory, code signing during builds, the default log window and character limit, and the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![The page scrolled further: the extra xcodebuild arguments, the DerivedData directory, code signing during builds, and the default log window and character limit](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
-**4. Host check and save** — the macOS verdict and the detected platform, the two detection buttons, and the save button:
+**4. Output directories and the host check** — where screenshots, logs and DerivedData land, then the macOS verdict with the two detection buttons:
 
-![The bottom of the page: the host check reading "macOS — supported (darwin/arm64)", the run-diagnostic and refresh buttons, and the save button](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
+![The bottom of the page: the data and screenshot directories, then the host check reading "macOS — supported (darwin/arm64)" with the run-diagnostic and refresh buttons](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` lists these four files in this order next to `package.json` in the repository, which is how a plugin market finds them.
 
@@ -206,7 +206,7 @@ Two behaviours deserve their own note:
 - `ios_logs` reads `log show` (no live stream), with a configurable and clamped window and length.
 - Swift macros (`@State`, `#Preview`) need `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed. `ios_build_app` then retries the build once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry: true`; a caller that was never sandboxed never sees a retry.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.
-- **The settings page has been looked at once, in DSH Desktop**: the plugin was installed into the `desktop` profile, the page opened at Settings → iOS Simulator, and the four shots in `assets/` are that session, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are covered by the render tests, not by eye.
+- **The settings page has only been checked by eye in DSH Desktop**: the plugin is installed into the `desktop` profile, and the four shots in `assets/` are the latest manual pass, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are still covered by the render tests, not by eye.
 - No credential handling: the plugin never reads or forwards key/token/secret environment variables.
 
 ## Releases

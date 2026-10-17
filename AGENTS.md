@@ -11,7 +11,7 @@ Working notes for coding agents in this repository. Everything below is specific
 | Tools | 21 native `ios_*` tools: project discovery/scaffolding, simulator boot/install/launch/terminate, screenshots, logs, optional `idb` UI automation. 20 keep the original names and arguments; `ios_shutdown_simulator` is added. |
 | Settings page | Settings → iOS Simulator: 17 fields in 5 groups, editable live through `ctx.configForms`. |
 | Skill / command | Bundled `ios-dev` skill (`skills/ios-dev/SKILL.md`) and a `/ios-dev [goal]` command that runs the environment diagnostic. |
-| Host | macOS only, with full Xcode. Every `ios_*` tool refuses in one sentence elsewhere. |
+| Host | macOS only, with full Xcode. Every Apple-tooling call refuses elsewhere; `ios_preflight` reports the failed host check instead, and the pure-filesystem tools (`ios_discover_project`, `ios_create_app`) plus `ios_ui_status` still answer. |
 | Package | Two halves: `lib/index.js` (host, Cordis) and `lib/client.js` (browser bundle for the settings page). |
 
 The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/`, not the package name — the title names this plugin, not the Apple product it drives, and the descriptions carry the non-affiliation line. The settings namespace, the `cordis.patch.yml` row id and the route prefix are all `ios-simulator-helper`.
@@ -34,7 +34,7 @@ npm pack --dry-run --cache /tmp/npm-cache --registry https://registry.npmjs.org 
 
 `pnpm run check` is the definition of done. It runs the unit suites, `scripts/check-bundle.mjs` (cross-half consistency) and `scripts/verify-mount.mjs` (mounting on a real Cordis `Context` and the real `ToolRuntime`). Do not report work as finished on `pnpm test` alone.
 
-`smoke:simulator` accepts `--device <fragment>`, `--data-dir <path>`, `--keep` and `--no-macros`. Swift macro expansion needs `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed; `ios_build_app` now repairs that by itself — it retries once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry` — so `--no-macros` is only a way to isolate macro expansion from this plugin's own orchestration.
+`smoke:simulator` accepts `--device <fragment>`, `--data-dir <path>`, `--keep` and `--no-macros`. Swift macro expansion needs `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed; `ios_build_app` now repairs that by itself — it retries once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry` — so `--no-macros` is only a way to isolate macro expansion from this plugin's own orchestration. It rewrites the generated `ContentView.swift` into a macro-free variant. The run needs no `--data-dir`: with none and no `IOS_SIM_PLUGIN_DATA` it writes under the generated project, which is what lets it finish from a sandboxed shell. Cleanup shuts down **only a simulator this run booted** — a target that was already running is left running.
 
 ## Repository map
 
@@ -44,6 +44,8 @@ cordis.patch.yml      the one `insert` row that mounts the host half
 ios-simulator.png     plugin icon: the ZCode plugin's artwork, cropped to its content; opaque square PNG (test asserts the shape and the loader limits)
 locale/en.json        plugin-page title/description; its presence is what enables the other languages
 locale/zh.json        the Simplified Chinese pair
+README.md             the user document (English, primary): install, settings, tools, limitations
+README.zh-CN.md       its structural Simplified Chinese mirror
 lib/index.js          host half: tools, skill, command, the three Fetch routes, settings policy
 lib/client.js         browser half: a hand-written __ModuleLoader__ bundle — there is no build step
 lib/settings.js       field declarations and the schemastery Config (every field .volatile())
@@ -64,16 +66,17 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 
 1. **The package name is the client module id.** `package.json` `name` = `id:` in `lib/client.js` = the `name:` of the row in `cordis.patch.yml`. `scripts/check-bundle.mjs` compares the first two.
 2. **One settings namespace.** The patch row id = `SETTINGS_NAMESPACE` in `lib/settings.js` = the literal in `lib/client.js` = the `/api/ios-simulator-helper` route prefix. Changing it means changing all four, and existing profiles keep their saved values keyed by the old id.
-3. **The browser half is a classic script, not a module.** It may only `require` the shell's static modules (React, `@deepseek-ai/dsh-client-ui-primitives`, …) and must never import a host module. Editing `lib/client.js` edits what ships — nothing compiles it.
+3. **The browser half is a classic script, not a module.** It may only `require` the shell's nine static modules — `react`, `react/jsx-runtime`, `react-dom`, `react-dom/client`, `@deepseek-ai/cordis`, `@deepseek-ai/dsh-client-store`, `@deepseek-ai/dsh-client-ui-slots`, `@deepseek-ai/dsh-client-ui-primitives`, `@deepseek-ai/dsh-client-ui-dockkit` (the table in `test/helpers/load-bundle.mjs`) — and must never import a host module. Editing `lib/client.js` edits what ships — nothing compiles it.
 4. **Two field tables must agree.** `lib/settings.js` (host) and the mirrored metadata in `lib/client.js` are compared key by key and option by option by the consistency gate. Change one, change both.
 5. **Platform logic lives in one place**: `lib/providers/host.js`. The platform is an injectable parameter so the non-macOS branch is testable on a Mac.
 6. **The plugin-page name is a package resource.** DSH resolves `<package>/locale/en.json` through `exports`, so `./locale/*.json` must stay exported and `locale` must stay in `files`; drop either and the page silently shows the raw package name. `en.json` also gates every other language file.
-7. **No runtime dependencies, and every `@deepseek-ai/*` peer states a lower bound only.** `>=0.2.0-rc.2`, never `^`/`~`/`<`: a hard upper bound means re-releasing this plugin every time the harness or a peer bumps a major, which is the trade the radeon-cloud-patcher plugin makes and this repository follows. `engines.dsh` and `dsh.compatibility.dsh` restate the `@deepseek-ai/dsh-tools` range verbatim, and only a peer range is enforced — pnpm's peer resolution, over `@deepseek-ai/dsh*` packages only; the harness reads neither `engines.dsh` nor `dsh.manifestVersion`. The cost is that node-semver does not admit a *new* tuple's prerelease (`0.2.1-alpha.1`) by default; README → Install → Version gate carries the two workarounds.
+7. **No runtime dependencies, and every `@deepseek-ai/*` peer states a lower bound only.** `>=0.2.0-rc.2`, never `^`/`~`/`<`: a hard upper bound means re-releasing this plugin every time the harness or a peer bumps a major, which is the trade the radeon-cloud-patcher plugin makes and this repository follows. `engines.dsh` and `dsh.compatibility.dsh` restate the `@deepseek-ai/dsh-tools` range verbatim, and `dsh.compatibility.dshReleases` names the release actually exercised (`0.2.0-rc.2`; `test/manifest.test.js` pins it). The DSH install gate reads only the `@deepseek-ai/dsh*` peers, but pnpm still resolves every peer — `cordis` and `schemastery` are widened for the same reason, since a hard upper bound on either blocks the install just the same. The harness reads neither `engines.dsh` nor `dsh.manifestVersion`. The cost is that node-semver does not admit a *new* tuple's prerelease (`0.2.1-alpha.1`) by default, and pnpm's peer resolution is the step that then fails; README → Install → Version gate tells users the two workarounds (a range branch for that tuple, or `--config.strict-peer-dependencies=false`).
 8. **Mount the package exactly once**, through `dsh.profile.bundles` or a profile patch row. Two mounts register every tool name twice and fail at the loader.
+9. **External commands are spawned directly**, through `node:child_process` in `lib/util/`, deliberately: `xcodebuild`, `simctl` and `idb` then behave byte-for-byte as they did in the original. That bypasses DSH's subprocess seam — no unified process management, environment scrubbing or shutdown-time termination — so every external call keeps an explicit timeout and a `SIGTERM`, and no credential environment variable is ever read or forwarded. Do not "fix" this into the harness seam without re-verifying the ported behaviour.
 
 ## Changing things safely
 
-- **A tool** — add it in `lib/tools/index.js` with an argument and result schema. The count is pinned in five places, so the gate fails until all agree: `test/host.test.js` and `scripts/verify-mount.mjs` (both `21`), the `description` of `locale/en.json` and `locale/zh.json`, and the README tool table. `verify-mount.mjs` also dispatches the read-only tools through the real registry and validates their JSON.
+- **A tool** — add it in `lib/tools/index.js` with an argument and result schema. The count is pinned in five places, so the gate fails until all agree: `test/host.test.js` and `scripts/verify-mount.mjs` (both `21`), the `description` of `locale/en.json` and `locale/zh.json`, and the README's tool list. `verify-mount.mjs` also dispatches the read-only tools through the real registry and validates their JSON.
 - **A settings field** — both field tables, then every place the count is pinned: `test/settings.test.js` ("17 fields in 5 groups"), `test/client-render.test.js` (field count and registration order), `scripts/verify-mount.mjs` (volatile count), and the README settings table. The gate fails on drift.
 - **A provider** — keep the ported behaviour; the parsers are covered by `test/providers.test.js`. Anything that needs a Mac belongs in `scripts/smoke.mjs`, not in `test/`.
 - **The window app** — Xcode 26 replaced `Simulator.app` with Device Hub (`com.apple.dt.Devices`, under `Contents/Applications`), so `open -a Simulator` alone is dead on a current Xcode. `lib/providers/sim.js` is the only place that resolves it, opening the window is best-effort there (its failure is returned as `openWarning`, never thrown out of `boot`), and `ios_show_simulator` is the only tool for which opening the window *is* the operation.
@@ -84,6 +87,7 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 
 - English everywhere: code, comments, JSDoc, commit messages, `README.md`, and this file. Two translations are deliberate: the settings page's UI strings (`en`/`zh` dictionaries inside the client half) and `README.zh-CN.md`.
 - `README.md` and `README.zh-CN.md` are structural mirrors — same headings in the same order, same tables, same counts. A change to one is a change to the other.
+- The READMEs are the **user document**: what the plugin is, how to install and configure it, what it does, what it does not. Development, verification, release and repository-shape conventions belong in this file instead, so keep them out of the READMEs — and do not restate here what a reader can work out unaided (how to clone and install from source, what an obviously named file contains).
 - ESM only, no transpiler, no bundler, no linter, no formatter. Keep to the style of the file you are editing.
 - 2-space indentation in every hand-written module. `lib/client.js` is the exception: its body sits one level inside the module-loader factory and is indented with tabs.
 - Every `lib/` module carries a JSDoc header naming it (`@module @zhz8888/dsh-ios-simulator-helper/<name>`); imports may precede the header. It explains why the module exists, not what each line does.
@@ -95,6 +99,17 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 - The tests are a contract, not a smoke screen: they pin the manifest and patch shape, the two field tables, the settings projection, the ported parsers, and the rendered page.
 - Render tests use real React and `react-dom/server`; only `@deepseek-ai/dsh-client-ui-primitives` is doubled, because it is a browser bundler input (CSS modules, `simple-icons`, `zustand/vanilla`) that plain Node cannot import.
 - Anything requiring Xcode, `simctl` or `idb` is a `scripts/smoke.mjs` concern and must never become a `pnpm test` requirement.
+
+Four layers, and what each one actually proves:
+
+| Layer | Command | Proves |
+|---|---|---|
+| Unit / parsers | `pnpm test` | bundle loading contract and static-module limits, manifest and patch contract, settings projection (volatile reads, env fallbacks, out-of-range fallbacks, boolean spellings), and the ported parsers |
+| Settings-page render | `pnpm test` (`client-render.test.js`) | the whole page rendered with real React in four host scenarios (macOS, Linux, Windows, undetectable), every dictionary key resolving, and the "only supports macOS" notice shown exactly on non-macOS |
+| Consistency gate | `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the two field tables agreeing key by key, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
+| Real host mount | `scripts/verify-mount.mjs` | real Cordis `Context` + real `ToolRuntime`: 21 tools registered, the read-only ones dispatched through the registry and schema-validated, malformed arguments and unknown tool names refused, 17 fields volatile, everything unregistered after dispose |
+
+`pnpm run smoke` covers what only a real machine can prove: Xcode discovery, actual `simctl` calls, whether the generated project compiles, product discovery and bundle-id resolution, and install / launch / screenshot / logs / terminate / shutdown.
 
 ## Commit conventions
 
@@ -144,10 +159,21 @@ build: bump the version to 1.0.0
 
 6. The README rendered on the npm page is the copy **inside the published tarball**. README edits reach npm only with the next publish, so land documentation before cutting the version that should carry it.
 
+## Marketplace requirements
+
+The repository is shaped for the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) list, and `test/manifest.test.js` pins the parts that list checks:
+
+- `dsh.bundle.patch` → `./cordis.patch.yml`, with `cordis.patch.yml` next to `package.json` and exactly one `insert` row whose id is the settings namespace.
+- Official `@deepseek-ai/*` packages declared as `peerDependencies`, never `dependencies`.
+- `screenshots.json` declaring 1–8 screenshots by relative, `..`-free image paths that all exist (the four live in `assets/`, which is a convention rather than an assertion).
+- `repository`, `homepage` and `bugs` pointing at the listed repository.
+
+The submission is a single YAML file in that repository (`data/plugins/zhz8888__dsh-ios-simulator-helper.yml`, with `url`/`name` pointing here, a `description.en` that states only what the code does, and category `dev`); nothing here ships it, and the list's CI rejects repositories younger than 24 hours.
+
 ## Do not
 
 - Bump the version without tagging, or move a tag that has been published.
 - Add a runtime dependency: the harness provides the peers, and a second copy of a `@deepseek-ai/*` package is a bug.
 - Let a settings field exist on one side of the plugin only, or change the namespace without changing all four places.
 - Commit screenshots, logs, build output or scratch profiles.
-- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "102 tests".
+- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — the README's "21 tools" and "17 fields" are claims of that kind, and the test count in Commands has to match what `pnpm test` prints.

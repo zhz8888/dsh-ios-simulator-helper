@@ -11,8 +11,8 @@ A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0`
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
 - 17 settings fields in 5 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
-- The settings page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every `ios_*` tool refuses in one clear sentence instead of failing with `spawn xcrun ENOENT`.
-- Published as `@zhz8888/dsh-ios-simulator-helper`, and the plugin page shows the name from `locale/en.json` and `locale/zh.json` — **iOS Simulator Helper** / **iOS 模拟器助手** — rather than the raw package name. The title names this helper rather than Apple's simulator, and both descriptions say the plugin is unofficial and not affiliated with Apple.
+- The settings page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every tool that drives Apple tooling then refuses with a clear message instead of failing with `spawn xcrun ENOENT`, while `ios_preflight` reports the failing host check and `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer.
+- Published as `@zhz8888/dsh-ios-simulator-helper`; the plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/` rather than the raw package name, and both descriptions say the plugin is unofficial and not affiliated with Apple.
 
 ## Quick start
 
@@ -40,11 +40,8 @@ On a Mac with full Xcode, at least one iOS runtime and DSH installed:
 - [Tools](#tools)
 - [Skill and slash command](#skill-and-slash-command)
 - [Differences from the original](#differences-from-the-original)
-- [Architecture](#architecture)
-- [Development and verification](#development-and-verification)
-- [Releases and versioning](#releases-and-versioning)
-- [Marketplace listing](#marketplace-listing)
 - [Known limitations](#known-limitations)
+- [Releases](#releases)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -66,17 +63,11 @@ On a Mac with full Xcode, at least one iOS runtime and DSH installed:
 dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
 ```
 
-**DSH Desktop**: the `desktop` profile belongs to the Electron app — open **Plugins**, add `@zhz8888/dsh-ios-simulator-helper` there, and enable the row it creates.
+**DSH Desktop**: the `desktop` profile belongs to the Electron app — open **Plugins**, add `@zhz8888/dsh-ios-simulator-helper` there, and enable the row it creates. After a reload or restart the page is at **Settings → iOS Simulator**; it only appears while the host half actually serves this plugin's settings namespace.
 
-The published tarball contains everything the plugin needs — the host half, the browser bundle, the bundled skill and the `locale/` entries — and nothing is compiled at install time, so no build approval step is involved.
-
-`package.json` declares `dsh.bundle.patch`, so DSH's reconcile step appends the package to `dsh.profile.bundles`, profile boot merges `cordis.patch.yml`, and exactly one host row is mounted. `@deepseek-ai/cordis`, `@deepseek-ai/dsh-tools` and `@deepseek-ai/schemastery` are **peer dependencies** provided by the harness: the plugin declares the versions it is built against instead of pulling in a second copy, and it has no runtime dependencies of its own. DSH's compatibility gate compares the `@deepseek-ai/dsh*` peer ranges against the running version and refuses to install on a mismatch.
+The published tarball contains everything the plugin needs — the host half, the browser bundle, the bundled skill and the `locale/` entries — and nothing is compiled at install time, so no build approval step is involved. `@deepseek-ai/cordis`, `@deepseek-ai/dsh-tools` and `@deepseek-ai/schemastery` are **peer dependencies** provided by the harness, so the plugin pulls in no second copy and has **no runtime dependencies** of its own; DSH's compatibility gate compares the `@deepseek-ai/dsh*` peer ranges against the running version and refuses to install on a mismatch.
 
 > Mount the package exactly once. `dsh plugin add` records the row in `dsh.profile.bundles`; adding a second row for the same package in the profile's own `cordis.patch.yml` registers every tool name twice and fails at the loader.
-
-### Open the settings page
-
-After a reload or restart, open **Settings → iOS Simulator**. The page only appears while the host half actually serves this plugin's settings namespace; otherwise it leaves no trace.
 
 ### Upgrade and uninstall
 
@@ -89,33 +80,22 @@ Settings live in the profile, not in the package, so both commands leave them in
 
 ### Version gate
 
-This plugin's DSH compatibility range is **`>=0.2.0-rc.2` — a lower bound only, no upper bound** — and it is declared in three places that stay verbatim identical (`peerDependencies`, `engines.dsh`, `dsh.compatibility.dsh`, asserted by `test/manifest.test.js`):
+The DSH compatibility range is **`>=0.2.0-rc.2`, a lower bound only**, declared identically in `peerDependencies`, `engines.dsh` and `dsh.compatibility.dsh`: a runtime below it is refused at install time, and no future harness release is excluded.
 
-- The DSH installer reads `peerDependencies`: a runtime below the lower bound is **refused at install time**, instead of loading a plugin whose tool APIs are missing.
-- **The upper bound is deliberately absent**: pinning one would mean re-releasing this plugin every time the harness bumps a major, which costs more than it buys. The price is losing the "a future version is blocked" protection — the plugin's own loud failures are the backstop.
-- `@deepseek-ai/cordis` and `@deepseek-ai/schemastery` are widened the same way: they do not take part in the install gate (only `@deepseek-ai/dsh*` peers do), but they are pnpm peers, and a hard upper bound there blocks the install just the same.
-- `dsh.compatibility.dshReleases` names the release that was actually exercised: `0.2.0-rc.2`, the harness this build was tested on.
+One node-semver detail survives — a **new tuple's** prerelease such as `0.2.1-alpha.1` is not admitted by npm's and pnpm's default rules, so that install fails until either the range gains a branch for the tuple (`">=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-0"`) or the peer check is skipped:
 
-> **A prerelease detail**: node-semver admits a prerelease only when the range carries a comparator on the same `major.minor.patch` that is itself tagged as a prerelease, so `>=0.2.0-rc.2` covers the `0.2.0` tuple (`0.2.0-rc.2` ✓) but not a **new tuple's** prerelease such as `0.2.1-alpha.1` (npm's and pnpm's default rules do not admit it; DSH's own gate sets `includePrerelease` and would — when the two disagree, pnpm is the step that fails). If that happens, pick either:
->
-> ```bash
-> # 1. add a branch for that tuple and write the range back, e.g.
-> #    ">=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-0"
->
-> # 2. or let pnpm skip peer checks (arguments are forwarded as they are)
-> dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
->   --config.strict-peer-dependencies=false
-> ```
->
-> Stable releases (`0.2.0`, `0.2.1`, `0.3.0`, `1.0.0`, …) are unaffected and always admitted.
+```bash
+dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
+  --config.strict-peer-dependencies=false
+```
+
+Stable releases (`0.2.0`, `0.2.1`, `0.3.0`, `1.0.0`, …) are unaffected and always admitted.
 
 ## Settings page
 
-The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The page reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness.
+The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The page reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness. It is one card per category, built from the same field kit as the built-in settings pages (`@deepseek-ai/dsh-client-ui-primitives`); the three timeouts are entered in whole seconds, while the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
 
-The page opens with the plugin's full name, then one card per category, so the categories stay apart without a rule between every block. A field is the platform's own shape — label, then control, then hint — and a switch shows its state in the track alone. The metrics come from `@deepseek-ai/dsh-client-ui-primitives` (`settings-form/fields.module.css`), the field kit the built-in settings pages use, so this page sits beside them. The three timeouts are entered in whole seconds (`120`, `60`, `600`); the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
-
-Saving happens in a small pill that sticks to the bottom of the page and centres itself in the column: it is there while edits are staged (or a write is in flight, or one failed), names that state next to a status dot, and carries **Discard changes** and **Save** — the shared `Button` primitive, with save disabled while a draft is invalid. A draft that merely puts a control back to the value already in effect counts as no edit at all, so flipping a switch back really does leave the form clean. A confirmation toast reports a write that landed, and leaving the page discards staged edits.
+Saving happens in a pill that sticks to the bottom of the page: it appears while edits are staged (or a write is in flight, or one failed), names that state next to a status dot, and carries **Discard changes** and **Save** (disabled while a draft is invalid). A draft that merely puts a control back to the value already in effect counts as no edit at all, a confirmation toast reports a write that landed, and leaving the page discards staged edits.
 
 | Group | Field | Type | Default | Legacy env fallback | Notes |
 |---|---|---|---|---|---|
@@ -139,9 +119,9 @@ Saving happens in a small pill that sticks to the bottom of the page and centres
 
 Below the form sit the host check and three buttons:
 
-- **Host system** — decided twice: synchronously from the browser's own platform string (so a non-macOS browser sees the notice on first paint, before any request), then authoritatively from the host half's `GET /api/ios-simulator-helper/host`. The host wins on a conflict. When the host is unsupported (or the browser is, and the host is unknown), a red notice titled **"This plugin only supports macOS"** appears above the form and names the detected platform.
+- **Host system** — decided twice: synchronously from the browser's own platform string (so a non-macOS browser sees the notice on first paint, before any request), then authoritatively from the host half's `GET /api/ios-simulator-helper/host`; the host wins on a conflict. When the host is unsupported — or the host never answered and the browser itself is non-macOS — a red notice titled **"This plugin only supports macOS"** appears above the form and names the detected platform.
 - **Run diagnostic** → `GET /api/ios-simulator-helper/status`, the same checks `ios_preflight` runs, listed one by one with status, detail and fix.
-- **Refresh simulators and runtimes** → `GET /api/ios-simulator-helper/inventory`, which discovers the Xcode path and version, the macOS version, simulators, runtimes and the resolved default target to fill the fields' suggestion lists.
+- **Refresh simulators and runtimes** → `GET /api/ios-simulator-helper/inventory`, which discovers the Xcode path and version, the macOS version, simulators, runtimes and the resolved default target, to fill the fields' suggestion lists.
 
 ### Legacy configuration
 
@@ -167,7 +147,7 @@ All four are the live page in DSH Desktop, in the order you scroll it — nothin
 
 ![The bottom of the page: the host check reading "macOS — supported (darwin/arm64)", the run-diagnostic and refresh buttons, and the save button](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
-`screenshots.json` lists these four files in this order next to `package.json`, which is how a plugin market finds them. `assets/` holds only these curated shots; run output and verification captures stay out of the repository (see `.gitignore`).
+`screenshots.json` lists these four files in this order next to `package.json` in the repository, which is how a plugin market finds them.
 
 ## Tools
 
@@ -196,12 +176,12 @@ All four are the live page in DSH Desktop, in the order you scroll it — nothin
 Two behaviours deserve their own note:
 
 - **`ios_screenshot`** always writes the PNG to disk (under `<data dir>/screenshots/` by default) and additionally submits it to the host's attachment service for a canonical image block. When the current model declares no image input, or the deployment stores no attachments, the result degrades to text plus the file path instead of failing the call.
-- **Bundle-id resolution in `ios_build_and_run`** (a fix over the original): the original asked `xcodebuild -showBuildSettings` and nothing else. Without `-derivedDataPath` that command prepares the *default* DerivedData directory, fails in a restricted environment, and the original silently returned `undefined` — so a successful build was followed by "bundle id could not be resolved". This plugin resolves in the order *explicit `bundleId` argument → `CFBundleIdentifier` of the `.app` that was just built (read with `plutil`, i.e. the value simctl installs) → `-showBuildSettings` with the same `-derivedDataPath` → identifiers found in `project.pbxproj`*, and reports the winner as `bundleIdSource`.
+- **`ios_build_and_run` resolves the bundle id in four steps** — a fix over the original, which asked `xcodebuild -showBuildSettings` alone and, in a restricted environment, silently returned `undefined` after a successful build: explicit `bundleId` argument → `CFBundleIdentifier` of the `.app` that was just built (read with `plutil`, i.e. the value simctl installs) → `-showBuildSettings` with the same `-derivedDataPath` → identifiers found in `project.pbxproj`. The winner is reported as `bundleIdSource`.
 
 ## Skill and slash command
 
-- **`ios-dev` skill** — shipped in `skills/ios-dev/`, registered by the host half through `ctx.skills.register()` as an embedded skill with the skill directory as its `resourceBase`. Rewritten for DSH: no `mcp__…` prefix, environment configuration points at the settings page, and the macOS precondition plus the "shut the simulator down when you are done" step are spelled out.
-- **`/ios-dev [goal]` command** — registered through `ctx.commands.register()`. DSH user commands deliberately never create a model message, so this command does the one thing that is useful without the model: it runs the environment diagnostic and prints the verdict, the failing checks and their fixes. On a non-macOS host the verdict is the "only supports macOS" sentence.
+- **`ios-dev` skill** — shipped in `skills/ios-dev/` and registered by the host half through `ctx.skills.register()` as an embedded skill with the skill directory as its `resourceBase`. Rewritten for DSH: no `mcp__…` prefix, environment configuration points at the settings page, and the macOS precondition plus the "shut the simulator down when you are done" step are spelled out.
+- **`/ios-dev [goal]` command** — registered through `ctx.commands.register()`. DSH user commands deliberately never create a model message, so this command does the one thing that is useful without the model: it runs the environment diagnostic and prints the verdict, the failing checks and their fixes.
 
 ## Differences from the original
 
@@ -209,7 +189,7 @@ Two behaviours deserve their own note:
 |---|---|---|
 | Tool exposure | stdio MCP server `ios-simulator`; the model sees `mcp__ios_simulator__*` | Native `ctx.tools.register()`; the model sees `ios_*` |
 | User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Settings page with 17 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
-| Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()`: one sentence per tool, plus the settings page's synchronous and authoritative verdicts |
+| Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()` in front of every Apple-tooling call, plus the settings page's synchronous and authoritative verdicts |
 | Working directory | `process.cwd()` | `exec.agent.session.header.cwd` (the session workspace) |
 | Data directory | `IOS_SIM_PLUGIN_DATA` / temp | `$DSH_HOME/ios-simulator-helper`, configurable on the settings page |
 | Path safety | `inside(cwd, path)` refuses escapes | Same semantics, split into read-only paths (an absolute `.app` is fine) and write targets (must stay inside the session workspace) |
@@ -218,138 +198,26 @@ Two behaviours deserve their own note:
 | Slash command | Injects a prompt into the model's conversation | Runs the diagnostic and prints the verdict |
 | Process invocation | `node:child_process` spawn | Unchanged |
 
-Keeping direct spawns is a deliberate trade-off: `xcodebuild`, `simctl` and `idb` then behave byte-for-byte as they did in the original. The cost is bypassing DSH's subprocess seam — no unified process management, environment scrubbing or shutdown-time termination. Every external call here has an explicit timeout and a `SIGTERM`, and no credential environment variable is read or forwarded.
-
-## Architecture
-
-```
-dsh-ios-simulator-helper/
-├── package.json            # dsh.bundle.patch, dsh.client, peer dependencies (compatibility gate)
-├── cordis.patch.yml        # - insert: [{ id: ios-simulator-helper, name: '@zhz8888/dsh-ios-simulator-helper' }]
-├── ios-simulator.png       # plugin icon: the artwork the ZCode ios-simulator plugin ships, cropped and downscaled
-├── locale/en.json          # plugin-page name and description (English; its presence is what enables every other language)
-├── locale/zh.json          # the Simplified Chinese pair
-├── README.md               # this file (English, primary)
-├── README.zh-CN.md         # Simplified Chinese edition
-├── lib/
-│   ├── index.js            # host half: tools, skill, command, three Fetch routes, settings policy
-│   ├── client.js           # browser half: hand-written __ModuleLoader__ bundle, settings page + host check
-│   ├── settings.js         # field declarations, schemastery Config (all .volatile()), live reads
-│   ├── runtime.js          # per-call runtime (session cwd + live settings + platform → data dirs)
-│   ├── tools/index.js      # 21 defineTool definitions, argument/result schemas, image admission
-│   ├── providers/          # ported file by file from the original, now taking the runtime explicitly
-│   └── util/               # process execution, paths, content blocks
-├── skills/ios-dev/         # SKILL.md
-├── scripts/                # check-bundle.mjs (consistency gate), verify-mount.mjs, smoke.mjs, link-dsh-deps.mjs
-└── test/                   # node:test unit and integration tests
-```
-
-Four constraints shaped the layout:
-
-1. **The settings namespace has exactly one source of truth**: the profile patch row id. The `id` in `cordis.patch.yml`, `SETTINGS_NAMESPACE` in `lib/settings.js` and the literal in `lib/client.js` must agree; `scripts/check-bundle.mjs` verifies them, the field-table drift between the two halves, the three routes, and that the macOS logic is still in place.
-2. **A browser bundle cannot import a host module** (the client purity gate forbids cross-plugin value imports), so the field table is written twice and kept honest by that gate; the bundle may only `require` the shell's nine static modules (React, Cordis, `dsh-client-store`, `dsh-client-ui-slots`, `dsh-client-ui-primitives`, `dsh-client-ui-dockkit`, …).
-3. **The platform check is centralised**: `hostInfo()` / `requireMacOS()` in `lib/providers/host.js` are the only places that read platform semantics, and the platform is an injectable parameter, so the non-macOS branch is testable on a Mac.
-4. **The plugin-page name is a package resource, not a manifest field**: DSH resolves `<package>/locale/en.json` through the `exports` map, so `./locale/*.json` has to stay exported and `locale` has to stay in `files`; either omission degrades silently to showing the raw package name. `en.json` is also the switch that enables every other language file, so it cannot be dropped in favour of `zh.json`. `test/manifest.test.js` pins all three conditions.
-
-## Development and verification
-
-```bash
-git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
-cd dsh-ios-simulator-helper
-pnpm install                  # test dependencies only (react, react-dom)
-pnpm test                     # 102 tests, no Xcode and no simulator required
-pnpm run check                # tests + host/client consistency gate + real Cordis mount
-pnpm run verify:mount         # real Cordis Context + real ToolRuntime registry
-pnpm run smoke                # read-only probes on the real machine
-pnpm run smoke:simulator      # generated project → build → install/launch → screenshot → logs → terminate → shutdown
-pnpm run link:dsh-deps        # offline development: symlink the local DSH @deepseek-ai packages
-```
-
-`smoke:simulator` accepts `--device <fragment>`, `--data-dir <path>`, `--keep` and `--no-macros`:
-
-- The data directory defaults to the generated project, so the run also completes from a restricted (sandboxed) shell, and the cleanup shuts down **only a simulator this run booted** — never one you were already using.
-- `--no-macros` replaces the generated `ContentView.swift` with a macro-free variant. The original template's `@State` / `#Preview` need `swift-plugin-server`, whose macro expansion runs under `sandbox-exec`; **a caller that is itself sandboxed cannot start that nested sandbox** and the compile fails with `sandbox-exec: sandbox_apply: Operation not permitted` — which has nothing to do with this plugin (the same command line fails for the original). The flag exists so the rest of the chain — build orchestration, product discovery, install, launch, screenshot, logs, terminate, shutdown — stays verifiable from such a shell.
-
-### Four verification layers
-
-| Layer | Command | What it proves |
-|---|---|---|
-| Unit / parsers | `pnpm test` | Client-bundle loading contract and static-module limits, manifest and patch contract, settings projection (live volatile reads, environment fallbacks, out-of-range fallbacks, boolean spellings), and the ported parsers (`simctl list` devices and runtimes, UDID validation, selection order, bundle-id sources, `plutil`, path boundaries, log clamping, lossless-JSON normalisation) |
-| Settings-page render | `pnpm test` (`client-render.test.js`) | The whole page rendered with real React and `react-dom/server` in four host scenarios (macOS, Linux, Windows, undetectable): every group, field and dictionary key present, controlled inputs carrying real values, switches and selects in the right state, **the "only supports macOS" notice shown on non-macOS and absent on macOS**, the notice naming the detected platform, and no unresolved dictionary key |
-| Consistency gate | `scripts/check-bundle.mjs` | Bundle id = package name, namespace = patch row id, the two field tables agreeing key by key and option by option, the three routes present on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
-| Real host mount | `scripts/verify-mount.mjs` | Mounting on a **real** Cordis `Context` and the **real** `ToolRuntime`: 21 tools registered, read-only tools dispatched through the registry and validated against their schemas, malformed arguments refused by the registry, unknown tool names unresolvable, all 17 settings fields volatile, and every tool unregistered after dispose |
-
-`smoke` covers what only a real machine can prove: Xcode discovery, actual `simctl` calls, whether the generated project compiles, product discovery and bundle-id resolution, and install / launch / screenshot / logs / terminate / shutdown.
-
-## Releases and versioning
-
-| Release | Date | npm | GitHub |
-|---|---|---|---|
-| `v1.1.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.1.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [release notes](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) |
-| `v1.0.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.0.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [release notes](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0) |
-
-A release is the same commit in two places, and that is checkable:
-
-```bash
-npm view @zhz8888/dsh-ios-simulator-helper@1.0.0 gitHead --registry https://registry.npmjs.org
-git rev-parse v1.0.0^{commit}   # prints the same commit
-```
-
-**Cutting a release**
-
-1. Bump `version` in `package.json` and commit it. The history uses `build: bump the version to x.y.z`.
-2. Publish from the tagged commit:
-
-   ```bash
-   npm publish --registry https://registry.npmjs.org --access public
-   ```
-
-   Both flags matter here: a typical local `.npmrc` points `registry` at a read-only mirror, and a scoped package stays private without `--access public`. On a 2FA account npm adds a browser approval step, which stages a temporary `0.0.0-stage` version before the real one.
-3. Write the GitHub Release for the tag — in English and Chinese, following the sections of the previous release: what the version contains, what changed, how to install it, and what was verified.
-
-> The README rendered on the npm page is the copy **inside the published tarball**, so README edits reach npm only with the next publish.
-
-## Marketplace listing
-
-This repository is shaped for the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) list and its [contributing guide](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md). What that guide asks for, and where it lives here:
-
-| Requirement | Where it is satisfied |
-|---|---|
-| A `dsh.bundle` manifest in `package.json` — the thing that makes `dsh plugin add` work | `dsh.bundle.patch` → `./cordis.patch.yml`; asserted by `test/manifest.test.js` |
-| A `cordis.patch.yml` next to `package.json` that mounts the plugin | `cordis.patch.yml`, one `insert` row whose id is the settings namespace |
-| Real, working code rather than a placeholder | `lib/` (host half, client half, 21 tools), `test/`, `scripts/` |
-| Official `@deepseek-ai/*` packages declared as `peerDependencies`, not `dependencies` | `package.json` — the package has **no runtime dependencies** |
-| A peer range that is explicit about prerelease harness builds | a lower bound only (`>=0.2.0-rc.2`), so no future stable release is excluded; the one gap — a new tuple's prerelease such as `0.2.1-alpha.1` — is spelled out with two workarounds under [Version gate](#version-gate) |
-| 1-8 screenshots declared in this repository | `screenshots.json` → `assets/`, with the `1-8`, in-repo, no-`..` rules asserted by `test/manifest.test.js` |
-| `repository`, `homepage` and `bugs` pointing at the listed repository | `package.json`, asserted by `test/manifest.test.js` |
-
-The submission itself is a single file in the list repository — `data/plugins/zhz8888__dsh-ios-simulator-helper.yml`, with `url: https://github.com/zhz8888/dsh-ios-simulator-helper`, `name: zhz8888/dsh-ios-simulator-helper` and a `description.en` that states only what the code does. Category `dev`: the plugin builds, runs and inspects iOS apps from the harness.
-
-Already in place:
-
-- The repository is public at [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper), carrying the `dsh-plugin` topic and ten more.
-- The package is on npm, so a storefront can show a download figure; its `repository` field points back here, which is what links the two.
-- `v1.0.0` is tagged and has a GitHub Release.
-
-Still outstanding:
-
-- **The repository has to be at least 24 hours old.** The list's CI rejects younger repositories, so the pull request can only be opened after that.
-
 ## Known limitations
 
-- **macOS only.** On any other host `ios_preflight` fails the `Host OS (macOS)` check, skips the remaining probes instead of producing meaningless spawn failures, and every `ios_*` tool refuses; the settings page keeps the notice at the top.
+- **macOS only.** On any other host `ios_preflight` fails the `Host OS (macOS)` check and skips the remaining probes instead of producing meaningless spawn failures; every tool that drives Apple tooling refuses, `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer, and the settings page keeps the notice at the top.
 - `ios_ui_*` needs `idb`; `ios_ui_status` explains what is missing. `xcodebuildmcp` is only a reserved value (matching the original's `reservedBackends`) and is not implemented.
 - The original's `ios_build_and_run` always opened the Simulator window; here that is the `autoOpenSimulator` setting (on by default, so behaviour matches). `ios_build_app` and `ios_screenshot` still do not open windows, as in the original. The window app is Simulator.app on Xcode 25 and earlier and Device Hub on Xcode 26 and later; a window that cannot be opened is reported in the result (`opened: false` plus `openWarning`) and never fails the `simctl` steps.
 - `ios_logs` reads `log show` (no live stream), with a configurable and clamped window and length.
 - Swift macros (`@State`, `#Preview`) need `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed. `ios_build_app` then retries the build once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry: true`; a caller that was never sandboxed never sees a retry.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.
-- **The settings page has been eyeballed once, in DSH Desktop**: the plugin was installed into the `desktop` profile, the page opened at Settings → iOS Simulator, and the four shots in `assets/` are that session, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are covered by the render tests, not by eye.
-- `@deepseek-ai/dsh-client-ui-primitives` is a browser bundler input (`*.module.css`, `simple-icons`, `zustand/vanilla`) that plain Node cannot import, so the render tests double that package; React itself and `react-dom/server` are real.
+- **The settings page has been looked at once, in DSH Desktop**: the plugin was installed into the `desktop` profile, the page opened at Settings → iOS Simulator, and the four shots in `assets/` are that session, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are covered by the render tests, not by eye.
 - No credential handling: the plugin never reads or forwards key/token/secret environment variables.
+
+## Releases
+
+Every release is one commit in two places: tagged `vX.Y.Z` on `main` and published to npm from that tag, whose SHA npm records as `gitHead`. The list is at [Releases](https://github.com/zhz8888/dsh-ios-simulator-helper/releases) — latest [`v1.1.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0), preceded by [`v1.0.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0), both 2026-10-17.
 
 ## Contributing
 
-Issues and pull requests are welcome at [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper/issues). Every change has to keep `pnpm check` green — it runs the unit tests, the bundle consistency gate and the real-host mount, see [Development and verification](#development-and-verification). There is no CLA and no form to fill in: a focused pull request that says what it changes and why is enough.
+Issues and pull requests are welcome at [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper/issues). Every change has to keep `pnpm check` green — unit tests, a host/client consistency gate and a mount on a real Cordis host — and there is no CLA or form to fill in: a focused pull request that says what it changes and why is enough.
+
+The package is shaped for the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) market. Development conventions — commands, invariants, testing, commit and release rules — live in [AGENTS.md](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/AGENTS.md).
 
 ## License
 

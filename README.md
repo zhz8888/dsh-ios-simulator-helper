@@ -52,7 +52,7 @@ On a Mac with full Xcode, at least one iOS runtime and DSH installed:
 
 | Dependency | Notes |
 |---|---|
-| macOS | The only supported host. `xcrun simctl`, `xcodebuild` and Simulator.app exist nowhere else. |
+| macOS | The only supported host. `xcrun simctl`, `xcodebuild` and the simulator window app exist nowhere else. |
 | Full Xcode | `xcode-select -p` must point at `Xcode.app/Contents/Developer`; Command Line Tools alone are not enough. |
 | An iOS Simulator runtime | At least one iOS/iPadOS runtime installed from Xcode → Settings → Platforms. |
 | Node.js ≥ 22 | The DSH host runtime. |
@@ -156,7 +156,7 @@ All four are the live page in DSH Desktop, in the order you scroll it — nothin
 | `ios_preflight` | Check the host (macOS), Xcode, `xcodebuild`, `simctl`, runtimes, simulators and the UI backend, and echo the current settings. |
 | `ios_list_simulators` | List iOS/iPadOS simulators and installed runtimes. |
 | `ios_boot_simulator` | Boot the selected simulator, optionally opening the Simulator window. |
-| `ios_show_simulator` | Open Simulator.app, optionally focused on one UDID. |
+| `ios_show_simulator` | Open the simulator window app — Simulator.app on Xcode 25 and earlier, Device Hub on Xcode 26 and later — optionally focused on one UDID. |
 | `ios_shutdown_simulator` | **Added**: shut the selected simulator down (`simctl shutdown`); already-stopped is a success, not an error. |
 | `ios_discover_project` | Find `.xcodeproj`/`.xcworkspace`, schemes and bundle ids. |
 | `ios_create_app` | Generate a minimal SwiftUI project (refuses to overwrite generated files by default). |
@@ -235,7 +235,7 @@ Four constraints shaped the layout:
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # test dependencies only (react, react-dom)
-pnpm test                     # 98 tests, no Xcode and no simulator required
+pnpm test                     # 99 tests, no Xcode and no simulator required
 pnpm run check                # tests + host/client consistency gate + real Cordis mount
 pnpm run verify:mount         # real Cordis Context + real ToolRuntime registry
 pnpm run smoke                # read-only probes on the real machine
@@ -316,7 +316,7 @@ Still outstanding:
 
 - **macOS only.** On any other host `ios_preflight` fails the `Host OS (macOS)` check, skips the remaining probes instead of producing meaningless spawn failures, and every `ios_*` tool refuses; the settings page keeps the notice at the top.
 - `ios_ui_*` needs `idb`; `ios_ui_status` explains what is missing. `xcodebuildmcp` is only a reserved value (matching the original's `reservedBackends`) and is not implemented.
-- The original's `ios_build_and_run` always opened the Simulator window; here that is the `autoOpenSimulator` setting (on by default, so behaviour matches). `ios_build_app` and `ios_screenshot` still do not open windows, as in the original.
+- The original's `ios_build_and_run` always opened the Simulator window; here that is the `autoOpenSimulator` setting (on by default, so behaviour matches). `ios_build_app` and `ios_screenshot` still do not open windows, as in the original. The window app is Simulator.app on Xcode 25 and earlier and Device Hub on Xcode 26 and later; a window that cannot be opened is reported in the result (`opened: false` plus `openWarning`) and never fails the `simctl` steps.
 - `ios_logs` reads `log show` (no live stream), with a configurable and clamped window and length.
 - Swift-macro projects cannot be compiled when the caller is itself sandboxed (see `--no-macros`); DSH host-half code runs outside the bash sandbox, so normal use is unaffected.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.

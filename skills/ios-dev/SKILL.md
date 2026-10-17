@@ -10,7 +10,7 @@ Use this skill when the user wants you to create, modify, build, run, debug, scr
 
 ## Platform Requirement
 
-This plugin works only on macOS with full Xcode installed. `xcrun simctl`, `xcodebuild` and Simulator.app do not exist on any other host.
+This plugin works only on macOS with full Xcode installed. `xcrun simctl`, `xcodebuild` and the simulator window app (Simulator.app, or Device Hub on Xcode 26 and later) do not exist on any other host.
 
 - If `ios_preflight` reports the `Host OS (macOS)` check as failing, stop immediately and tell the user the plugin only supports macOS. Do not attempt to work around it.
 - Command Line Tools alone are not enough: `xcode-select -p` must point at an Xcode.app developer directory.
@@ -41,10 +41,10 @@ The tools are registered directly on the agent, without an MCP server prefix, so
 
 ## Tool Notes
 
-- This plugin intentionally uses Apple's macOS Simulator app for rendering. Do not create or expect a custom simulator window.
+- This plugin intentionally uses Apple's own simulator window app for rendering — Simulator.app on Xcode 25 and earlier, Device Hub on Xcode 26 and later. Do not create or expect a custom simulator window, and do not treat a window that failed to open as a failed run: every `simctl` step still ran.
 - The tools accept `udid`, `device`, and `runtime` when a specific simulator is needed. Otherwise they choose the booted simulator, then the configured default device (`defaultDevice`, `iPhone 16` out of the box).
 - `ios_list_simulators` returns both devices and installed runtimes; use it before asking the user which device to target.
-- `ios_build_app` only builds. `ios_build_and_run` builds, installs, launches, and shows Simulator.
+- `ios_build_app` only builds. `ios_build_and_run` builds, installs, launches, and shows the simulator window.
 - `ios_logs` reads `log show` output for the recent window (120 seconds by default); narrow it with `bundleId`, `seconds`, and `limit` instead of dumping everything.
 - Screenshots land under the plugin data directory (`$DSH_HOME/ios-simulator-helper/screenshots` by default) unless `path` is passed; the returned `path` is relative to the session workspace.
 
@@ -52,7 +52,7 @@ The tools are registered directly on the agent, without an MCP server prefix, so
 
 Everything configurable lives on **Settings → iOS Simulator** (profile-scoped, applied on the next tool call):
 
-- **Simulator and device** — default device and runtime fragments, whether a simulator is booted automatically, whether Simulator.app opens automatically, boot timeout.
+- **Simulator and device** — default device and runtime fragments, whether a simulator is booted automatically, whether the simulator window app opens automatically, boot timeout.
 - **UI automation** — `uiBackend` (`auto` / `idb` / `xcodebuildmcp` / `none`), the `idb` executable, per-command timeout.
 - **Build and DerivedData** — default configuration, build timeout, extra `xcodebuild` arguments, DerivedData directory, whether code signing is disabled.
 - **Logs** — default log window and character limit.

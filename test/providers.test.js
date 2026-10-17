@@ -7,7 +7,7 @@ import { defaultDataRoot, inside, readablePath, rel } from '../lib/util/path.js'
 import { splitArgumentLines } from '../lib/util/run.js'
 import { toLosslessJson, truncate } from '../lib/util/content.js'
 import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/providers/host.js'
-import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, validUdid, list } from '../lib/providers/sim.js'
+import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
 import { clampLimit, clampSeconds } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
 import { pickAppProduct } from '../lib/providers/build.js'
@@ -159,6 +159,42 @@ test('a runtime fragment filters the candidates', () => {
   // A configured runtime is a preference: a stale value must not break the call.
   const configured = chooseSimulator(SHUTDOWN_ONLY, {}, { defaultDevice: 'iPhone', defaultRuntime: 'iOS-99' })
   assert.equal(configured.name, 'iPhone 18 Pro')
+})
+
+/**
+ * Xcode 26 replaced Simulator.app with Device Hub under Contents/Applications,
+ * so `open -a Simulator` alone can no longer show a window. The attempt list is
+ * what the `show` tool walks, and the focus argument stays on Simulator.app
+ * only because Device Hub's per-device argument is not documented.
+ */
+test('the window app attempts cover both Xcode layouts, most likely first', () => {
+  const developer = '/Applications/Xcode.app/Contents/Developer'
+  const installed = new Set([
+    path.join(developer, '..', 'Applications', 'DeviceHub.app'),
+    '/Applications/Simulator.app',
+  ])
+  const attempts = simulatorAppAttempts(developer, 'BE512F00-415F-46FC-B9ED-B12A73C7EBDA', (file) => installed.has(path.resolve(file)))
+  assert.deepEqual(
+    attempts.map((item) => item.app),
+    ['Simulator', 'DeviceHub', 'Simulator', 'Simulator', 'DeviceHub'],
+    'the apps of the selected developer directory come before /Applications, and the bundle ids last',
+  )
+  assert.deepEqual(attempts[0].args, ['open', '-a', 'Simulator'], 'the focus-less name form is still tried when a UDID was given')
+  assert.deepEqual(
+    attempts[1].args,
+    ['open', path.join(developer, '..', 'Applications', 'DeviceHub.app')],
+    'Device Hub is opened by path, without an unverifiable focus argument',
+  )
+  assert.deepEqual(
+    attempts[2].args,
+    ['open', '/Applications/Simulator.app', '--args', '-CurrentDeviceUDID', 'BE512F00-415F-46FC-B9ED-B12A73C7EBDA'],
+  )
+  assert.deepEqual(attempts.at(-1).args, ['open', '-b', 'com.apple.dt.Devices'], 'the bundle id is the last resort')
+
+  // With nothing installed the list still carries the bundle-id forms, and no
+  // path is invented for an app that is not there.
+  const bare = simulatorAppAttempts(undefined, undefined, () => false)
+  assert.deepEqual(bare.map((item) => item.args), [['open', '-b', 'com.apple.iphonesimulator'], ['open', '-b', 'com.apple.dt.Devices']])
 })
 
 test('an unusable device list is reported with the fix', () => {

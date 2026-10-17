@@ -52,7 +52,7 @@
 
 | 依赖 | 说明 |
 |---|---|
-| macOS | 唯一支持的宿主。`xcrun simctl`、`xcodebuild`、Simulator.app 只存在于 macOS |
+| macOS | 唯一支持的宿主。`xcrun simctl`、`xcodebuild`、模拟器窗口应用只存在于 macOS |
 | 完整 Xcode | `xcode-select -p` 必须指向 `Xcode.app/Contents/Developer`；仅装 Command Line Tools 不够 |
 | iOS Simulator 运行时 | Xcode → Settings → Platforms 里至少安装一个 iOS/iPadOS 运行时 |
 | Node.js ≥ 22 | DSH 宿主运行时 |
@@ -156,7 +156,7 @@ dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # �
 | `ios_preflight` | 检查宿主是否 macOS、Xcode/`xcodebuild`/`simctl`、运行时、模拟器与 UI 后端，并回显当前设置 |
 | `ios_list_simulators` | 列出 iOS/iPadOS 模拟器与已安装运行时 |
 | `ios_boot_simulator` | 启动选定模拟器，可选打开 Simulator 窗口 |
-| `ios_show_simulator` | 打开 Simulator.app 并聚焦指定 UDID |
+| `ios_show_simulator` | 打开模拟器窗口应用（Xcode 25 及更早为 Simulator.app，Xcode 26 及以后为 Device Hub）并可聚焦指定 UDID |
 | `ios_shutdown_simulator` | **新增**：关闭选定模拟器（`simctl shutdown`），已关闭时报成功而非错误 |
 | `ios_discover_project` | 发现 `.xcodeproj`/`.xcworkspace`、scheme 与 bundle id |
 | `ios_create_app` | 生成最小 SwiftUI 工程（默认拒绝覆盖已生成文件） |
@@ -235,7 +235,7 @@ dsh-ios-simulator-helper/
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # 只装测试依赖（react、react-dom）
-pnpm test                     # 98 个测试（不需要 Xcode，不需要模拟器）
+pnpm test                     # 99 个测试（不需要 Xcode，不需要模拟器）
 pnpm run check                # 测试 + host/client 一致性闸门 + 真实 Cordis 挂载验证
 pnpm run verify:mount         # 真实 Cordis Context + 真实 ToolRuntime 注册表
 pnpm run smoke                # 只读真机探测：preflight / 模拟器 / 运行时 / 项目发现 / inventory
@@ -316,7 +316,7 @@ git rev-parse v1.0.0^{commit}   # 两者应打印同一个提交
 
 - **仅支持 macOS**：非 macOS 上 `ios_preflight` 会把 `Host OS (macOS)` 标为失败并跳过其余探测（不做无意义的 spawn），所有 `ios_*` 工具直接拒绝；设置页顶部常驻提示。
 - `idb` 未安装时 `ios_ui_*` 不可用，`ios_ui_status` 会说明原因；`xcodebuildmcp` 只是保留值（与原插件的 `reservedBackends` 一致），尚未实现。
-- 原插件的 `ios_build_and_run` 会无条件打开 Simulator 窗口；本插件把它交给 `autoOpenSimulator` 设置（默认开，行为与原插件一致），`ios_build_app` / `ios_screenshot` 仍按原语义不主动开窗。
+- 原插件的 `ios_build_and_run` 会无条件打开 Simulator 窗口；本插件把它交给 `autoOpenSimulator` 设置（默认开，行为与原插件一致），`ios_build_app` / `ios_screenshot` 仍按原语义不主动开窗。窗口应用在 Xcode 25 及更早是 Simulator.app，在 Xcode 26 及以后是 Device Hub；窗口打不开时只在结果里报告（`opened: false` 与 `openWarning`），不会让 `simctl` 步骤失败。
 - `ios_logs` 与原插件一样只做 `log show`（不做实时流），窗口与长度可配置且有上限。
 - Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；**在沙箱内调用本插件时这类工程无法编译**（真机集成测试因此提供 `--no-macros`）。DSH 宿主半侧的代码运行在 bash 沙箱之外，正常使用不受影响。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。

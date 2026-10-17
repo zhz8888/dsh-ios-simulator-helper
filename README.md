@@ -235,7 +235,7 @@ Four constraints shaped the layout:
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # test dependencies only (react, react-dom)
-pnpm test                     # 99 tests, no Xcode and no simulator required
+pnpm test                     # 100 tests, no Xcode and no simulator required
 pnpm run check                # tests + host/client consistency gate + real Cordis mount
 pnpm run verify:mount         # real Cordis Context + real ToolRuntime registry
 pnpm run smoke                # read-only probes on the real machine

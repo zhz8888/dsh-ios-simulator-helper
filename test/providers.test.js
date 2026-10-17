@@ -204,6 +204,30 @@ test('an unusable device list is reported with the fix', () => {
   )
 })
 
+/**
+ * The installed list holds "iPhone 17e" before "iPhone 17" on a current Xcode,
+ * so a fragment that is also somebody's full name must not resolve to the
+ * longer device.
+ */
+test('an exact device name beats a longer name that contains it', () => {
+  const sims = parseSimulators(
+    JSON.stringify({
+      devices: {
+        'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [
+          { name: 'iPhone 17e', udid: '094A1DAB-AB04-4DAB-B088-43BD0FBBA89E', state: 'Shutdown', isAvailable: true },
+          { name: 'iPhone 17', udid: 'BE512F00-415F-46FC-B9ED-B12A73C7EBDA', state: 'Shutdown', isAvailable: true },
+        ],
+      },
+    }),
+  )
+  assert.equal(chooseSimulator(sims, { device: 'iPhone 17' }, {}).name, 'iPhone 17')
+  assert.equal(chooseSimulator(sims, {}, { defaultDevice: 'iPhone 17' }).name, 'iPhone 17')
+  assert.equal(chooseSimulator(sims, { device: 'iphone 17' }, {}).name, 'iPhone 17', 'the match ignores case')
+  // A fragment that matches nothing exactly still falls back to the longer name.
+  assert.equal(chooseSimulator(sims, { device: 'iPhone 17e' }, {}).name, 'iPhone 17e')
+  assert.equal(chooseSimulator(sims, { device: 'iPhone 1' }, {}).name, 'iPhone 17e')
+})
+
 test('the macOS-only gate explains itself in one sentence', () => {
   assert.equal(isSupportedHost('darwin'), true)
   assert.equal(isSupportedHost('linux'), false)

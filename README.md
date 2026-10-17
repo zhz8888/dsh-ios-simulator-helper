@@ -127,7 +127,7 @@ The original plugin's `userConfig` (`default_device`, `ui_backend`) and its envi
 
 ## Screenshots
 
-All four are the live page in DSH Desktop, in the order you scroll it — nothing is mocked up.
+All four are the live page in DSH Desktop, in the order you scroll it — nothing is mocked up. They were captured before the card layout and the sticky action bar that 1.1.0 ships, so they show the same controls in the earlier arrangement, and the save button these captions mention is now the page's action bar.
 
 **1. Simulator and device** — the fields every `ios_*` call reads:
 

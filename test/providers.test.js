@@ -12,7 +12,7 @@ import { clampLimit, clampSeconds } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
 import { macroSandboxDenied, pickAppProduct } from '../lib/providers/build.js'
 import { preflight } from '../lib/providers/preflight.js'
-import { status as uiStatus } from '../lib/providers/ui.js'
+import { status as uiStatus, unavailableMessage } from '../lib/providers/ui.js'
 
 /**
  * Pure-function tests for the ported providers.
@@ -272,6 +272,19 @@ test('the UI backend setting is honoured without probing idb when it cannot help
   assert.equal(auto.available, false)
   assert.equal(auto.backend, 'none')
   assert.match(auto.detail, /definitely-not-idb-12345/)
+})
+
+/**
+ * The refusal is the only thing a user sees when idb is missing, so it has to
+ * read as two sentences whatever shape the status detail arrived in.
+ */
+test('the idb refusal reads as sentences even when the detail ends in a period', () => {
+  const withPeriod = unavailableMessage({ backend: 'none', detail: 'UI automation is turned off by the plugin setting.' })
+  assert.match(withPeriod, /setting\. Install idb and idb-companion/)
+  assert.doesNotMatch(withPeriod, /\.\./)
+  const withoutPeriod = unavailableMessage({ backend: 'none', detail: 'uiBackend = auto found no automation binary' })
+  assert.match(withoutPeriod, /binary\. Install idb/)
+  assert.match(withoutPeriod, /^UI automation backend unavailable \(none\): /)
 })
 
 test('the log window and limit are clamped, never trusted', () => {

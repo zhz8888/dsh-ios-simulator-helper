@@ -20,7 +20,7 @@ The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `l
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 101 tests, no Xcode and no simulator needed
+pnpm test                    # 102 tests, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount
 pnpm run verify:mount        # real Cordis Context + real ToolRuntime registry only
@@ -150,4 +150,4 @@ build: bump the version to 1.0.0
 - Add a runtime dependency: the harness provides the peers, and a second copy of a `@deepseek-ai/*` package is a bug.
 - Let a settings field exist on one side of the plugin only, or change the namespace without changing all four places.
 - Commit screenshots, logs, build output or scratch profiles.
-- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "101 tests".
+- Describe behaviour the code does not have. The plugin market reads the README and the plugin metadata as claims and checks them against the source, so keep both accurate — including counts such as "21 tools", "17 fields" and "102 tests".

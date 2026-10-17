@@ -235,7 +235,7 @@ dsh-ios-simulator-helper/
 git clone https://github.com/zhz8888/dsh-ios-simulator-helper.git
 cd dsh-ios-simulator-helper
 pnpm install                  # 只装测试依赖（react、react-dom）
-pnpm test                     # 101 个测试（不需要 Xcode，不需要模拟器）
+pnpm test                     # 102 个测试（不需要 Xcode，不需要模拟器）
 pnpm run check                # 测试 + host/client 一致性闸门 + 真实 Cordis 挂载验证
 pnpm run verify:mount         # 真实 Cordis Context + 真实 ToolRuntime 注册表
 pnpm run smoke                # 只读真机探测：preflight / 模拟器 / 运行时 / 项目发现 / inventory

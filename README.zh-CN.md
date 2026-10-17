@@ -87,6 +87,28 @@ dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # �
 
 设置保存在 profile 里而不是包里，所以这两条命令都不会动它。数据目录（默认 `$DSH_HOME/ios-simulator-helper`）存放截图、构建日志与 DerivedData，卸载不会删除它，是否清理由你决定。
 
+### 版本闸门
+
+本插件的 DSH 兼容范围是 **`>=0.2.0-rc.2`——只有下界，没有上界**，三处声明逐字一致（`peerDependencies`、`engines.dsh`、`dsh.compatibility.dsh`，由 `test/manifest.test.js` 断言）：
+
+- DSH 安装器读的是 `peerDependencies`：运行时版本低于下界 → **直接拒绝安装**，不会出现「装上了但工具 API 不存在」；
+- **上界故意不写**：写死上界意味着 DSH 每升一个大版本都要重发一版插件去放宽范围，代价大于收益。换来的代价是失去「未来版本被挡住」这层保护——改由插件自己的响亮失败兜底；
+- `@deepseek-ai/cordis` 与 `@deepseek-ai/schemastery` 同理放宽为 `>=4.0.4` / `>=3.18.4`：它们**不参与**安装闸门（判定只看 `@deepseek-ai/dsh*` 开头的包），但都是 pnpm 的 peer，写死上界同样会在它们升大版本时把安装卡住；
+- `dsh.compatibility.dshReleases` 写明实测过的版本：`0.2.0-rc.2`，也就是本次验证所用的 harness。
+
+> **预发布的一个细节**：node-semver 规定，带预发布标签的版本只有在范围里存在「元组相同、且自身也带预发布标签」的比较符时才被放行。`>=0.2.0-rc.2` 因此只覆盖 `0.2.0` 这一元组的预发布（`0.2.0-rc.2` ✓）；`0.2.1-alpha.1` 这类**新元组的预发布**在 npm/pnpm 的默认规则下不被放行（DSH 自己的闸门带 `includePrerelease`，会放行——两者判定不一致时，失败的是 pnpm 那一步）。真遇到时二选一：
+>
+> ```bash
+> # ① 给该元组补一条分支，写回范围（例如到 0.2.1 的预发布）
+> #    ">=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-0"
+>
+> # ② 或让 pnpm 放宽 peer 校验（参数照样原样转发）
+> dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
+>   --config.strict-peer-dependencies=false
+> ```
+>
+> 稳定版（`0.2.0`、`0.2.1`、`0.3.0`、`1.0.0`…）不受这个细节影响，一律放行。
+
 ## 设置页面
 
 设置命名空间 = profile patch 行 id = `ios-simulator-helper`（同时是 `dsh.name`）。页面通过 `ctx.configForms` 读写，因此具备暂存编辑、脏值检测、内联校验、乐观并发（revision）与「已覆盖/恢复默认」语义。
@@ -297,7 +319,7 @@ git rev-parse v1.0.0^{commit}   # 两者应打印同一个提交
 | `package.json` 旁边有 `cordis.patch.yml` 用于挂载插件 | `cordis.patch.yml`，一个 `insert` 行，行 id 即设置命名空间 |
 | 真实可用代码，而非占位 | `lib/`（host 半侧、client 半侧、21 个工具）、`test/`、`scripts/` |
 | 官方 `@deepseek-ai/*` 必须是 `peerDependencies`，不能是 `dependencies` | `package.json` —— 本包**没有任何运行时依赖** |
-| peer 区间不能静默排除 harness 的预发布版本 | 含预发布的区间都补齐下一段元组：`^0.2.0-rc.2 \|\| ^0.2.1-alpha.1` |
+| peer 区间对 harness 预发布版本有明确交代 | 只用下界（`>=0.2.0-rc.2`），未来的稳定版都不会被排除；唯一缺口——`0.2.1-alpha.1` 这类新元组预发布——在[版本闸门](#版本闸门)里写明并给出两种绕过方式 |
 | 在自己的仓库里声明 1-8 张截图 | `screenshots.json` → `assets/`；张数、是否在仓库内、禁止 `..` 由 `test/manifest.test.js` 断言 |
 | `repository`、`homepage`、`bugs` 指向被收录的仓库 | `package.json`，由 `test/manifest.test.js` 断言 |
 

@@ -109,13 +109,23 @@ test('official @deepseek-ai packages are peers, never runtime dependencies', () 
   }
 })
 
-test('a peer range naming a prerelease also names the next prerelease tuple', () => {
-  // node-semver only lets a prerelease satisfy a range when some comparator on
-  // the same major.minor.patch carries a prerelease tag itself: `^0.2.0-rc.2`
-  // alone silently excludes 0.2.1-alpha.5, which is how users meet ERESOLVE.
+/**
+ * The DSH requirement follows the radeon-cloud-patcher plugin's pattern: a
+ * lower bound only, no upper bound, declared verbatim in three places. Only the
+ * peer range is enforced — `dsh plugin add` runs pnpm's peer resolution over the
+ * `@deepseek-ai/dsh*` peers, while the harness reads neither `engines.dsh` nor
+ * `dsh.manifestVersion` today — so asserting the three agree is what keeps the
+ * declaration honest.
+ */
+test('the DSH range states a lower bound only, declared identically three times', () => {
+  assert.equal(manifest.engines.dsh, '>=0.2.0-rc.2')
+  assert.equal(manifest.dsh.compatibility.dsh, manifest.engines.dsh)
+  assert.equal(manifest.peerDependencies['@deepseek-ai/dsh-tools'], manifest.engines.dsh)
+  assert.equal(manifest.dsh.compatibility.dshReleases['0.2.0-rc.2'], 'compatible')
+  // No upper bound anywhere: `^`, `~` or `<` would mean re-releasing this
+  // plugin every time the harness or a peer bumps a major.
   for (const [name, range] of Object.entries(manifest.peerDependencies)) {
-    if (!/-(?:rc|alpha|beta)\.\d+/.test(range)) continue
-    assert.match(range, /\|\|/, `${name} needs an explicit branch for the next prerelease tuple`)
+    assert.match(range, /^>=/, `${name} must state a lower bound only`)
   }
 })
 

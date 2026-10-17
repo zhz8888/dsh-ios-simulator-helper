@@ -87,6 +87,28 @@ dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # u
 
 Settings live in the profile, not in the package, so both commands leave them in place. The data directory (by default `$DSH_HOME/ios-simulator-helper`) holds screenshots, build logs and DerivedData; it is yours to delete, and uninstalling does not touch it.
 
+### Version gate
+
+This plugin's DSH compatibility range is **`>=0.2.0-rc.2` — a lower bound only, no upper bound** — and it is declared in three places that stay verbatim identical (`peerDependencies`, `engines.dsh`, `dsh.compatibility.dsh`, asserted by `test/manifest.test.js`):
+
+- The DSH installer reads `peerDependencies`: a runtime below the lower bound is **refused at install time**, instead of loading a plugin whose tool APIs are missing.
+- **The upper bound is deliberately absent**: pinning one would mean re-releasing this plugin every time the harness bumps a major, which costs more than it buys. The price is losing the "a future version is blocked" protection — the plugin's own loud failures are the backstop.
+- `@deepseek-ai/cordis` and `@deepseek-ai/schemastery` are widened the same way: they do not take part in the install gate (only `@deepseek-ai/dsh*` peers do), but they are pnpm peers, and a hard upper bound there blocks the install just the same.
+- `dsh.compatibility.dshReleases` names the release that was actually exercised: `0.2.0-rc.2`, the harness this build was tested on.
+
+> **A prerelease detail**: node-semver admits a prerelease only when the range carries a comparator on the same `major.minor.patch` that is itself tagged as a prerelease, so `>=0.2.0-rc.2` covers the `0.2.0` tuple (`0.2.0-rc.2` ✓) but not a **new tuple's** prerelease such as `0.2.1-alpha.1` (npm's and pnpm's default rules do not admit it; DSH's own gate sets `includePrerelease` and would — when the two disagree, pnpm is the step that fails). If that happens, pick either:
+>
+> ```bash
+> # 1. add a branch for that tuple and write the range back, e.g.
+> #    ">=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-0"
+>
+> # 2. or let pnpm skip peer checks (arguments are forwarded as they are)
+> dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
+>   --config.strict-peer-dependencies=false
+> ```
+>
+> Stable releases (`0.2.0`, `0.2.1`, `0.3.0`, `1.0.0`, …) are unaffected and always admitted.
+
 ## Settings page
 
 The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The page reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness.
@@ -297,7 +319,7 @@ This repository is shaped for the [awesome-dsh-plugin](https://github.com/awesom
 | A `cordis.patch.yml` next to `package.json` that mounts the plugin | `cordis.patch.yml`, one `insert` row whose id is the settings namespace |
 | Real, working code rather than a placeholder | `lib/` (host half, client half, 21 tools), `test/`, `scripts/` |
 | Official `@deepseek-ai/*` packages declared as `peerDependencies`, not `dependencies` | `package.json` — the package has **no runtime dependencies** |
-| A peer range that does not silently exclude prerelease harness builds | every range that names a prerelease also names its next tuple: `^0.2.0-rc.2 \|\| ^0.2.1-alpha.1` |
+| A peer range that is explicit about prerelease harness builds | a lower bound only (`>=0.2.0-rc.2`), so no future stable release is excluded; the one gap — a new tuple's prerelease such as `0.2.1-alpha.1` — is spelled out with two workarounds under [Version gate](#version-gate) |
 | 1-8 screenshots declared in this repository | `screenshots.json` → `assets/`, with the `1-8`, in-repo, no-`..` rules asserted by `test/manifest.test.js` |
 | `repository`, `homepage` and `bugs` pointing at the listed repository | `package.json`, asserted by `test/manifest.test.js` |
 

@@ -39,7 +39,7 @@ npm pack --dry-run --cache /tmp/npm-cache --registry https://registry.npmjs.org 
 ## Repository map
 
 ```
-package.json          version, the dsh manifest (bundle patch + client), peer ranges, files whitelist
+package.json          version, the dsh manifest (bundle patch + client + compatibility), peer ranges, files whitelist
 cordis.patch.yml      the one `insert` row that mounts the host half
 ios-simulator.png     plugin icon: the ZCode plugin's artwork, cropped to its content; opaque square PNG (test asserts the shape and the loader limits)
 locale/en.json        plugin-page title/description; its presence is what enables the other languages
@@ -68,7 +68,7 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 4. **Two field tables must agree.** `lib/settings.js` (host) and the mirrored metadata in `lib/client.js` are compared key by key and option by option by the consistency gate. Change one, change both.
 5. **Platform logic lives in one place**: `lib/providers/host.js`. The platform is an injectable parameter so the non-macOS branch is testable on a Mac.
 6. **The plugin-page name is a package resource.** DSH resolves `<package>/locale/en.json` through `exports`, so `./locale/*.json` must stay exported and `locale` must stay in `files`; drop either and the page silently shows the raw package name. `en.json` also gates every other language file.
-7. **No runtime dependencies.** Every `@deepseek-ai/*` package is a peer, and every peer range that names a prerelease also names its next tuple (`^0.2.0-rc.2 || ^0.2.1-alpha.1`) — a single-tuple range silently excludes later prerelease harness builds, which reaches users as `ERESOLVE`.
+7. **No runtime dependencies, and every `@deepseek-ai/*` peer states a lower bound only.** `>=0.2.0-rc.2`, never `^`/`~`/`<`: a hard upper bound means re-releasing this plugin every time the harness or a peer bumps a major, which is the trade the radeon-cloud-patcher plugin makes and this repository follows. `engines.dsh` and `dsh.compatibility.dsh` restate the `@deepseek-ai/dsh-tools` range verbatim, and only a peer range is enforced — pnpm's peer resolution, over `@deepseek-ai/dsh*` packages only; the harness reads neither `engines.dsh` nor `dsh.manifestVersion`. The cost is that node-semver does not admit a *new* tuple's prerelease (`0.2.1-alpha.1`) by default; README → Install → Version gate carries the two workarounds.
 8. **Mount the package exactly once**, through `dsh.profile.bundles` or a profile patch row. Two mounts register every tool name twice and fail at the loader.
 
 ## Changing things safely

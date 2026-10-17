@@ -263,6 +263,7 @@ pnpm run link:dsh-deps        # 离线开发：把本机 DSH 的 @deepseek-ai �
 
 | 版本 | 日期 | npm | GitHub |
 |---|---|---|---|
+| `v1.1.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.1.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [Release 说明](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) |
 | `v1.0.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.0.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [Release 说明](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0) |
 
 一次发布意味着同一个提交出现在两个地方，而且这件事是可核对的：

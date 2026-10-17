@@ -263,6 +263,7 @@ pnpm run link:dsh-deps        # offline development: symlink the local DSH @deep
 
 | Release | Date | npm | GitHub |
 |---|---|---|---|
+| `v1.1.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.1.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [release notes](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) |
 | `v1.0.0` | 2026-10-17 | [`@zhz8888/dsh-ios-simulator-helper@1.0.0`](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper) | [release notes](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0) |
 
 A release is the same commit in two places, and that is checkable:

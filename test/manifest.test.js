@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { decodePng, pixelAt } from './helpers/decode-png.mjs'
 
 /**
  * Contract tests for the package manifest and the Cordis patch.
@@ -184,15 +185,64 @@ test('the declared plugin icon is the artwork, inside the loader limits', () => 
   assert.ok(!existsSync(path.join(ROOT, 'icon.svg')), 'the superseded iconfont must stay gone')
 })
 
-test('the icon paints its own background, so it needs no light/dark variant', () => {
-  // The superseded icon was a transparent monochrome wordmark and had to invert
-  // itself for the dark theme. The artwork shipped now is opaque: it carries its
-  // own background and reads the same on either theme, so an alpha channel here
-  // would mean a half-transparent tile instead. The IHDR holds those two fields
-  // at fixed offsets, which makes this checkable without an image decoder.
-  const bytes = readFileSync(path.join(ROOT, 'ios-simulator.png'))
-  assert.equal(bytes.readUInt8(24), 8, 'the IHDR bit depth must stay 8')
-  assert.equal(bytes.readUInt8(25), 2, 'the IHDR colour type must stay truecolour without alpha')
+test('the icon keys the grey backdrop out of the four corners', () => {
+  // The artwork sits on a flat #F5F5F7 tile, which reads as a washed-out grey
+  // square in a dark list, so the tile is keyed out and the blue artwork — which
+  // carries its own contrast on either theme — now sits on whatever surface the
+  // host paints. The key has to carry the edge colours outwards: erasing a flat
+  // background naively leaves a rim of half-blended tile pixels, invisible on a
+  // white page and glaring on dark. That is why this test decodes the sprite
+  // instead of reading its header.
+  const image = decodePng(readFileSync(path.join(ROOT, 'ios-simulator.png')))
+  assert.equal(image.width, 192)
+  assert.equal(image.height, 192)
+  assert.equal(image.channels, 4, 'the icon must carry an alpha channel')
+
+  // The whole corner region, not one pixel of it: the rounded corner is what
+  // the tile was filling, and a 12 px inset is still inside it.
+  const CORNER = 12
+  const corners = [
+    [0, 0],
+    [image.width - CORNER, 0],
+    [0, image.height - CORNER],
+    [image.width - CORNER, image.height - CORNER],
+  ]
+  for (const [x0, y0] of corners) {
+    for (let y = y0; y < y0 + CORNER; y += 1) {
+      for (let x = x0; x < x0 + CORNER; x += 1) {
+        assert.equal(pixelAt(image, x, y).a, 0, `the corner at ${x},${y} must be transparent`)
+      }
+    }
+  }
+
+  // Two halves of the same defect: a partially covered pixel that still carries
+  // the tile's exact colour, and one pale enough to read as tile against a dark
+  // host. The artwork's own pale pixels (the device shapes) are opaque, so the
+  // second check only has to look at partial coverage.
+  const TILE = { r: 245, g: 245, b: 247 }
+  const TOLERANCE = 6
+  let transparent = 0
+  let palest = 0
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const { r, g, b, a } = pixelAt(image, x, y)
+      if (a === 0) {
+        transparent += 1
+        continue
+      }
+      if (a === 255) continue
+      const offTile = Math.max(Math.abs(r - TILE.r), Math.abs(g - TILE.g), Math.abs(b - TILE.b))
+      assert.ok(offTile > TOLERANCE, `the half-transparent pixel at ${x},${y} still carries the keyed-out tile colour`)
+      palest = Math.max(palest, 0.299 * r + 0.587 * g + 0.114 * b)
+    }
+  }
+  // The tile's own luma is 245, so a partially covered pixel this pale is a
+  // leftover rim rather than artwork.
+  assert.ok(palest < 200, `a half-transparent pixel is as pale as the keyed-out tile: ${palest.toFixed(0)}`)
+
+  // The key must remove the tile without hollowing the artwork out.
+  assert.equal(pixelAt(image, 96, 96).a, 255, 'the artwork itself must stay opaque')
+  assert.ok(transparent > 4000, `the tile does not look keyed out: only ${transparent} transparent pixels`)
 })
 
 test('the repository fields name the public repo a plugin list links to', () => {

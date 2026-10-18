@@ -41,7 +41,7 @@ npm pack --dry-run --cache /tmp/npm-cache --registry https://registry.npmjs.org 
 ```
 package.json          version, the dsh manifest (bundle patch + client + compatibility), peer ranges, files whitelist
 cordis.patch.yml      the one `insert` row that mounts the host half
-ios-simulator.png     plugin icon: the ZCode plugin's artwork, cropped to its content; opaque square PNG (test asserts the shape and the loader limits)
+ios-simulator.png     plugin icon: the ZCode plugin's artwork at 192 px, its grey backdrop keyed out (test decodes it)
 locale/en.json        plugin-page title/description; its presence is what enables the other languages
 locale/zh.json        the Simplified Chinese pair
 README.md             the user document (English, primary): install, settings, tools, limitations
@@ -92,6 +92,38 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 - 2-space indentation in every hand-written module. `lib/client.js` is the exception: its body sits one level inside the module-loader factory and is indented with tabs.
 - Every `lib/` module carries a JSDoc header naming it (`@module @zhz8888/dsh-ios-simulator-helper/<name>`); imports may precede the header. It explains why the module exists, not what each line does.
 - Comment the decisions that are not obvious from the code — why a fallback order is what it is, why a limit exists, what a silent failure would look like. Do not narrate straightforward code.
+
+## The icon is the upstream artwork with its backdrop keyed out
+
+`ios-simulator.png` is the artwork ZCode's own marketplace serves for the
+`ios-simulator` plugin it ships, cropped to its content and kept at 192 × 192.
+The artwork sits on a flat `#F5F5F7` tile, and that tile is keyed out here: a
+light grey square reads as a washed-out box in a dark list, while the blue
+rounded square carries its own contrast on either theme. Replacing this with a
+hand-drawn mark is a regression, not a restyle.
+
+The key works by flooding the flat tile inwards from the border, keeping a core
+at least six pixels inside the silhouette as the colour sources, filling every
+pixel with the nearest core colour, and taking alpha from unmixing the observed
+pixel against that colour and `#F5F5F7`. Both shortcuts fail visibly: a plain
+`-fuzz N% -transparent` leaves a rim of half-blended tile pixels, because the
+antialiased edge is neither tile nor artwork, and a coarse colour threshold cuts
+through the artwork's own shading and leaves flat patches. The soft drop shadow
+under the rounded square comes through the same unmixing as a low-alpha edge,
+which is what keeps it from surviving as a grey ring.
+
+`dsh-app-boot` resolves `package.json.icon` to a regular file inside the package
+directory, admits SVG, PNG, JPEG and WebP only, caps it at 256 KiB, and inlines
+the bytes as a base64 data URL — so the icon ships in the tarball. It has no
+opacity requirement; the artwork's own contrast is what makes transparency safe
+here, and the superseded opaque tile was the version that needed a background.
+`test/manifest.test.js` pins the PNG signature, the square frame, the 128 px
+floor and that cap, then decodes the sprite (`test/helpers/decode-png.mjs`, built
+on `node:zlib`) to confirm the four corner blocks are fully transparent, that no
+partially transparent pixel still carries the tile colour or is as pale as it,
+and that the artwork itself stays opaque. A re-exported opaque icon, a naively
+fuzzed one, or one hollowed out by an over-aggressive key fails the suite instead
+of shipping.
 
 ## Testing
 

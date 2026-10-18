@@ -91,7 +91,7 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 - The READMEs are the **user document**: what the plugin is, how to install and configure it, what it does, what it does not. Development, verification, release and repository-shape conventions belong in this file instead, so keep them out of the READMEs — and do not restate here what a reader can work out unaided (how to clone and install from source, what an obviously named file contains).
 - ESM only, no transpiler, no bundler, no linter, no formatter. Keep to the style of the file you are editing.
 - 2-space indentation in every hand-written module. `lib/client.js` is the exception: its body sits one level inside the module-loader factory and is indented with tabs.
-- Every `lib/` module carries a JSDoc header naming it (`@module @zhz8888/dsh-ios-simulator-helper/<name>`); imports may precede the header. It explains why the module exists, not what each line does.
+- Every `lib/` module opens with a JSDoc block explaining why it exists, not what each line does; imports may precede it. All but `lib/util/path.js` and `lib/util/run.js` also carry the `@module @zhz8888/dsh-ios-simulator-helper/<name>` tag, and `lib/index.js` names the package itself with no suffix.
 - Comment the decisions that are not obvious from the code — why a fallback order is what it is, why a limit exists, what a silent failure would look like. Do not narrate straightforward code.
 
 ## The icon is the upstream artwork with its backdrop keyed out
@@ -142,7 +142,7 @@ Four layers, and what each one actually proves:
 | Consistency gate | `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the two field tables agreeing key by key, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
 | Real host mount | `scripts/verify-mount.mjs` | real Cordis `Context` + real `ToolRuntime`: 21 tools registered, the read-only ones dispatched through the registry and schema-validated, malformed arguments and unknown tool names refused, 17 fields volatile, everything unregistered after dispose |
 
-`pnpm run smoke` covers what only a real machine can prove: Xcode discovery, actual `simctl` calls, whether the generated project compiles, product discovery and bundle-id resolution, and install / launch / screenshot / logs / terminate / shutdown.
+`pnpm run smoke` is the read-only half of that: Xcode discovery, actual `simctl` calls, `ios_discover_project`, the settings-page inventory route and `ios_ui_status`. The write path — scaffold a project, compile it, resolve the built product's bundle id, then install / launch / screenshot / logs / terminate / shutdown — is `pnpm run smoke:simulator`.
 
 ## Commit conventions
 
@@ -166,7 +166,7 @@ build: bump the version to 1.0.0
 
 1. Bump `version` in `package.json`, commit it as `build: bump the version to x.y.z`.
 2. Tag `vX.Y.Z` (lightweight, like the existing tags) and push `main` **and** the tag.
-3. Publish from the tagged commit. Both flags are required: the local `.npmrc` points `registry` at a read-only mirror, and a scoped package stays private without public access.
+3. Publish from the tagged commit. Both flags are required: the npm config on a dev machine here (`~/.npmrc` — there is no `.npmrc` in this repository) points `registry` at a read-only mirror, and a scoped package stays private without public access.
 
    ```bash
    npm publish --registry https://registry.npmjs.org --access public
@@ -198,7 +198,7 @@ The repository is shaped for the [awesome-dsh-plugin](https://github.com/awesome
 
 - `dsh.bundle.patch` → `./cordis.patch.yml`, with `cordis.patch.yml` next to `package.json` and exactly one `insert` row whose id is the settings namespace.
 - Official `@deepseek-ai/*` packages declared as `peerDependencies`, never `dependencies`.
-- `screenshots.json` declaring 1–8 screenshots by relative, `..`-free image paths that all exist (the four live in `assets/`, which is a convention rather than an assertion).
+- `screenshots.json` declaring 1–8 screenshots by relative, `..`-free image paths that all exist (the four live in `assets/`, which is a convention rather than an assertion). Refreshing them is a four-part move, not a file swap: recapture the live page in DSH Desktop at the same four scroll positions (Chinese locale; no save bar, which only appears once an edit is staged), then update `assets/`, the order in `screenshots.json` and the four captions in **both** READMEs together.
 - `repository`, `homepage` and `bugs` pointing at the listed repository.
 
 The submission is a single YAML file in that repository (`data/plugins/zhz8888__dsh-ios-simulator-helper.yml`, with `url`/`name` pointing here, a `description.en` that states only what the code does, and category `dev`); nothing here ships it, and the list's CI rejects repositories younger than 24 hours.

@@ -1,9 +1,9 @@
 # dsh-ios-simulator-helper
 
-[English](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/README.md) | [简体中文](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/README.zh-CN.md)
+[English](README.md) | **简体中文**
 
 [![npm version](https://img.shields.io/npm/v/@zhz8888/dsh-ios-simulator-helper.svg)](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper)
-[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE)
+[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 [![target: DSH](https://img.shields.io/badge/DSH-0.2.x-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
@@ -217,8 +217,8 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 问题与 PR 都欢迎提到 [github.com/zhz8888/dsh-ios-simulator-helper](https://github.com/zhz8888/dsh-ios-simulator-helper/issues)。每个改动都要保持 `pnpm check` 全绿——它会跑单元测试、host/client 一致性闸门与真实 Cordis 宿主挂载——没有 CLA，也没有需要填的表单：一个说明改了什么、为什么改的聚焦 PR 就够了。
 
-本包按 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 市场的要求整理。开发规范——命令、不变式、测试、提交与发布规则——见 [AGENTS.md](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/AGENTS.md)。
+本包按 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 市场的要求整理。开发规范——命令、不变式、测试、提交与发布规则——见 [AGENTS.md](AGENTS.md)。
 
 ## 许可
 
-[MIT](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE)，版权所有 (c) 2026 zhz8888。工具与 provider 逻辑移植自 ZCode 官方 `ios-simulator` 插件（同样以 MIT 分发，版权归 Z.ai），SwiftUI 工程模板逐字保留；完整的来源与版权说明见 [LICENSE](https://github.com/zhz8888/dsh-ios-simulator-helper/blob/main/LICENSE) 末尾的归属章节。
+[MIT](LICENSE)，版权所有 (c) 2026 zhz8888。工具与 provider 逻辑移植自 ZCode 官方 `ios-simulator` 插件（同样以 MIT 分发，版权归 Z.ai），SwiftUI 工程模板逐字保留；完整的来源与版权说明见 [LICENSE](LICENSE) 末尾的归属章节。

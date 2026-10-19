@@ -3,9 +3,15 @@ import { test } from 'node:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import * as plugin from '../lib/index.js'
+// Before the plugin, deliberately. `lib/util/run.js` takes `spawn` as an ESM
+// named import of a CommonJS builtin, and the binding is taken when the
+// importing module is instantiated — so a static import of the plugin would be
+// linked, and the real `spawn` captured, before this file's body ran. The
+// plugin is therefore loaded dynamically below. Three cases here reach real
+// providers, which on a Mac reaches `xcodebuild`, `simctl` and `idb`; see the
+// helper's header.
+import { seam } from './helpers/offline-seam.mjs'
 import { FIELD_KEYS, SETTINGS_NAMESPACE } from '../lib/settings.js'
-import { renderCommandReport } from '../lib/index.js'
 
 /**
  * Host-half tests against a hand-written Cordis context.
@@ -14,7 +20,14 @@ import { renderCommandReport } from '../lib/index.js'
  * suite pins what the plugin itself contributes — the tool surface, the skill,
  * the command, the three Fetch routes and the settings policy — and that a
  * deployment missing any optional service still mounts the rest.
+ *
+ * Apple's command-line tools are answered by `test/helpers/offline-seam.mjs`,
+ * so no case here can start the simulator stack or need Xcode installed.
  */
+
+/** The plugin, loaded after the seam has replaced `spawn` — see the import comment. */
+const plugin = await import('../lib/index.js')
+const { renderCommandReport } = plugin
 
 /** Tool names as the original ZCode plugin published them, plus this plugin's addition. */
 const ORIGINAL_TOOLS = [
@@ -344,4 +357,16 @@ test('settings namespace fields reach the tool layer through the live config', a
   assert.equal(typeof value.available, 'boolean')
   assert.ok(FIELD_KEYS.includes('uiBackend'))
   assert.ok(['auto', 'idb', 'xcodebuildmcp', 'none'].includes(value.setting), `unexpected setting: ${value.setting}`)
+})
+
+/**
+ * The seam answers Apple-tool probes from a table, so a case that tries to
+ * boot, install on or shut down a simulator is visible here — instead of
+ * quietly doing it on the developer's Mac, which is what it did before the seam
+ * existed. Asserted last, which only holds while this file keeps `node:test`'s
+ * default in-order, non-concurrent execution.
+ */
+test('the suite changes no simulator state and reaches no unstubbed command', () => {
+  assert.deepEqual(seam.mutating, [], 'a unit test tried to change simulator state')
+  assert.deepEqual(seam.unknown, [], 'an unstubbed command was reached; add it to test/helpers/offline-seam.mjs or stop reaching the machine')
 })

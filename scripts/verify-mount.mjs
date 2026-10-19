@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
-import * as plugin from '../lib/index.js'
 
 /**
  * Mount the plugin on a REAL Cordis context with the REAL tool registry, then
@@ -13,7 +13,14 @@ import * as plugin from '../lib/index.js'
  * registry validates the argument and result schemas for real, the fiber owns
  * `tools.register`, and disposal is exercised through the actual lifecycle.
  *
- * Run with `pnpm run verify:mount`.
+ * Hermetic by default, because DSH mounts every profile bundle at application
+ * boot: the load itself must start nothing, and this harness must not be the
+ * reason a schema question spins up the simulator stack. `xcodebuild`,
+ * `xcrun simctl` and `idb` start CoreSimulatorService and enumerate simulator
+ * runtimes and devices, so they belong to `scripts/smoke.mjs`; `--with-simulator`
+ * opts into them here.
+ *
+ * Run with `pnpm run verify:mount`, or `pnpm run verify:mount -- --with-simulator`.
  */
 
 let failures = 0
@@ -23,6 +30,36 @@ function check(label, ok, detail) {
   if (!ok) failures += 1
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${detail === undefined ? '' : ` -- ${JSON.stringify(detail)}`}`)
 }
+
+/** Command names that mean the simulator stack was touched. */
+const APPLE_TOOLS = ['xcodebuild', 'xcode-select', 'xcrun', 'simctl', 'idb', 'sw_vers']
+
+/** Whether the caller asked for the probes that reach Apple's tooling. */
+const withSimulator = process.argv.includes('--with-simulator')
+
+// Record every child process before the plugin is imported. `lib/util/run.js`
+// takes `spawn` as an ESM named import of a CommonJS builtin, and that binding
+// snapshots the property at module evaluation, so a later patch would be ignored.
+const require = createRequire(import.meta.url)
+const childProcess = require('node:child_process')
+const util = require('node:util')
+const spawned = []
+for (const name of ['spawn', 'spawnSync', 'exec', 'execFile', 'execFileSync', 'execSync', 'fork']) {
+  const original = childProcess[name]
+  if (typeof original !== 'function') continue
+  const recorded = function (...args) {
+    spawned.push(Array.isArray(args[0]) ? args[0].join(' ') : String(args[0]))
+    return original.apply(this, args)
+  }
+  // A plain wrapper drops `util.promisify.custom`, and `promisify(execFile)`
+  // then resolves to a different shape for anything else in this process. Note
+  // the flip side: a promisified call delegates to the original and so bypasses
+  // this recorder — the plugin reaches the machine only through `spawn`.
+  if (original[util.promisify.custom] !== undefined) recorded[util.promisify.custom] = original[util.promisify.custom]
+  childProcess[name] = recorded
+}
+
+const plugin = await import('../lib/index.js')
 
 const ctx = new Context()
 
@@ -54,6 +91,10 @@ check('the real ToolRuntime mounted', ctx.get('tools') !== undefined)
 const pluginFiber = ctx.plugin(plugin, {})
 await pluginFiber
 
+// The load is the whole point: DSH runs this at application boot, so anything
+// started here is started on every launch.
+check('mounting the plugin starts no subprocess', spawned.length === 0, spawned)
+
 const tools = ctx.get('tools')
 /** Ask the registry which tool names it publishes, through the real provider path. */
 const toolNames = () =>
@@ -69,10 +110,13 @@ const signal = new AbortController().signal
 
 // The registry validates each body's value against its declared result schema,
 // which is how a mismatch between a provider's shape and a tool's schema is
-// caught. These need no project, and preflight needs no device, so they run
-// everywhere; the simulator list needs macOS and is only dispatched there.
-const alwaysRunnable = ['ios_preflight', 'ios_discover_project']
-for (const name of [...alwaysRunnable, ...(process.platform === 'darwin' ? ['ios_list_simulators'] : [])]) {
+// caught. `ios_discover_project` answers from the filesystem alone; off macOS
+// `ios_preflight` refuses before it probes anything, so it is free there and
+// spawns six commands on macOS — which is why it is not in the macOS list.
+const alwaysRunnable =
+  process.platform === 'darwin' ? ['ios_discover_project'] : ['ios_preflight', 'ios_discover_project']
+
+for (const name of alwaysRunnable) {
   const result = await tools.execute({ name, arguments: {}, callId: `verify-${name}`, signal })
   check(`${name} dispatched through the real registry`, result.isError !== true, result.error?.message?.slice(0, 90))
   const payload = result.content?.find((block) => block.type === 'text')?.text ?? ''
@@ -80,11 +124,27 @@ for (const name of [...alwaysRunnable, ...(process.platform === 'darwin' ? ['ios
 }
 
 // Off macOS the plugin must refuse in words, not crash: the gate is the port's
-// whole reason for centralising the platform check.
+// whole reason for centralising the platform check. The refusal is the host
+// check, so it happens before any probe.
 if (process.platform !== 'darwin') {
   const refused = await tools.execute({ name: 'ios_list_simulators', arguments: {}, callId: 'verify-refused', signal })
   check('a simulator tool refuses off macOS', refused.isError === true, refused.error?.message?.slice(0, 120))
   check('the refusal names macOS', /only supports macOS/.test(refused.error?.message ?? ''))
+}
+
+// ── opt-in: the same tools against the real machine ──────────────────────────
+// These are the two that reach Apple's tooling, and reaching it is the whole
+// reason they are not in the list above. `pnpm run smoke` is the fuller version
+// of this; the flag exists so the real dispatch can still be exercised here.
+if (withSimulator && process.platform === 'darwin') {
+  for (const name of ['ios_preflight', 'ios_list_simulators']) {
+    const result = await tools.execute({ name, arguments: {}, callId: `verify-real-${name}`, signal })
+    check(`${name} dispatched against the real machine`, result.isError !== true, result.error?.message?.slice(0, 90))
+    const payload = result.content?.find((block) => block.type === 'text')?.text ?? ''
+    check(`${name} rendered model-visible JSON`, payload.trimStart().startsWith('{'), payload.slice(0, 60))
+  }
+} else if (withSimulator) {
+  console.log(`note: --with-simulator is macOS-only; this host is ${process.platform}`)
 }
 
 // Argument validation is the registry's, not ours: a wrong type must be refused
@@ -113,6 +173,18 @@ const afterDispose = toolNames().filter((name) => name.startsWith('ios_'))
 check('disposing the plugin fiber unregisters every tool', afterDispose.length === 0, afterDispose.length)
 
 await runtimeFiber.dispose()
+
+// ── the whole hermetic run stayed off Apple's tooling ────────────────────────
+if (withSimulator) {
+  // The caller asked for the real-machine path; a spawn here is the point.
+  console.log(`note: --with-simulator was requested; ${spawned.length} command(s) ran against the real machine`)
+} else {
+  const apple = spawned.filter((command) => APPLE_TOOLS.some((tool) => command.includes(tool)))
+  check('the hermetic run never reaches Apple tooling', apple.length === 0, apple)
+  if (process.platform === 'darwin' && apple.length === 0) {
+    console.log('note: the simulator probes were skipped; `pnpm run smoke` or `--with-simulator` runs them')
+  }
+}
 
 console.log(failures === 0 ? '\nverify-mount: OK' : `\nverify-mount: ${failures} failure(s)`)
 assert.ok(true)

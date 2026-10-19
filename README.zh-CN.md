@@ -139,9 +139,9 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ![滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. 构建尾部与日志** —— 额外 `xcodebuild` 参数、DerivedData 目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限：
+**3. 构建尾部与日志** —— DerivedData 目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限，以及输出目录的开头：
 
-![继续向下滚动：额外 xcodebuild 参数、DerivedData 目录、构建时禁用代码签名，以及默认日志窗口与默认日志字符上限](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![继续向下滚动：DerivedData 目录、构建时禁用代码签名，接着是默认日志窗口与默认日志字符上限，以及数据目录与截图目录](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
 **4. 输出目录与宿主检测** —— 截图/日志/DerivedData 的落盘位置，然后是 macOS 判定与两个检测按钮：
 

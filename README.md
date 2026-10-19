@@ -139,9 +139,9 @@ All four are the live page in DSH Desktop, in the order you scroll it — nothin
 
 ![The page scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. Build tail and logs** — the extra `xcodebuild` arguments, the DerivedData directory and the code-signing switch, then the `ios_logs` window and character limit:
+**3. Build tail and logs** — the DerivedData directory and the code-signing switch, then the `ios_logs` window and character limit, and the start of the output directories:
 
-![The page scrolled further: the extra xcodebuild arguments, the DerivedData directory, code signing during builds, and the default log window and character limit](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![The page scrolled further: the DerivedData directory and code signing during builds, then the default log window and character limit, and the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
 **4. Output directories and the host check** — where screenshots, logs and DerivedData land, then the macOS verdict with the two detection buttons:
 

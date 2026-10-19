@@ -211,7 +211,7 @@ Two behaviours deserve their own note:
 
 ## Releases
 
-Every release is one commit in two places: tagged `vX.Y.Z` on `main` and published to npm from that tag, whose SHA npm records as `gitHead`. The list is at [Releases](https://github.com/zhz8888/dsh-ios-simulator-helper/releases) — [`v1.1.1`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.1) is the latest, after [`v1.1.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) and [`v1.0.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0), all three dated 2026-10-17.
+Every release is one commit in two places: tagged `vX.Y.Z` on `main` and published to npm from that tag, whose SHA npm records as `gitHead`. The list is at [Releases](https://github.com/zhz8888/dsh-ios-simulator-helper/releases) — [`v1.1.2`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.2) is the latest, dated 2026-10-19, after [`v1.1.1`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.1), [`v1.1.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) and [`v1.0.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0), all three dated 2026-10-17.
 
 ## Contributing
 

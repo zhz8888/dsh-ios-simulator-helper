@@ -341,10 +341,14 @@ test('a path escaping the session workspace is refused by the tool body', async 
     const { registered } = mount()
     const install = registered.tools.find((tool) => tool.name === 'ios_install_app')
     const exec = { agent: { session: { header: { cwd: dir } } }, signal: undefined }
+    const before = seam.commands.length
     await assert.rejects(
       () => install.execute({ appPath: '../../evil.app' }, exec),
       /escapes the session workspace/,
     )
+    // The refusal has to come first: `boot` can start a simulator, and the seam
+    // would have recorded that `simctl` call here.
+    assert.deepEqual(seam.commands.slice(before), [], 'a refused call must not touch a simulator')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@zhz8888/dsh-ios-simulator-helper.svg)](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
-[![target: DSH](https://img.shields.io/badge/DSH-0.2.x-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+[![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个完整的 **设置页面**（设置 → iOS 模拟器），让默认设备、运行时、UI 后端、构建参数与输出目录都能在应用里配置，而不是靠环境变量。
 

@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@zhz8888/dsh-ios-simulator-helper.svg)](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
-[![target: DSH](https://img.shields.io/badge/DSH-0.2.x-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+[![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a full **settings page** (Settings → iOS Simulator) that edits the simulator parameters in-app instead of through environment variables.
 

@@ -103,7 +103,7 @@ test('declares the bundle patch and a web client half', () => {
 })
 
 test('pins the DSH releases the host half is built against', () => {
-  assert.match(manifest.peerDependencies['@deepseek-ai/dsh-tools'], /0\.2\.0-rc\.2/)
+  assert.match(manifest.peerDependencies['@deepseek-ai/dsh-tools'], /0\.2\.1-rc\.2/)
   assert.match(manifest.peerDependencies['@deepseek-ai/cordis'], /4\.0\.4/)
   assert.match(manifest.peerDependencies['@deepseek-ai/schemastery'], /3\.18\.4/)
 })
@@ -118,17 +118,18 @@ test('official @deepseek-ai packages are peers, never runtime dependencies', () 
 
 /**
  * The DSH requirement follows the radeon-cloud-patcher plugin's pattern: a
- * lower bound only, no upper bound, declared verbatim in three places. Only the
- * peer range is enforced — `dsh plugin add` runs pnpm's peer resolution over the
- * `@deepseek-ai/dsh*` peers, while the harness reads neither `engines.dsh` nor
- * `dsh.manifestVersion` today — so asserting the three agree is what keeps the
- * declaration honest.
+ * lower bound only, no upper bound, declared verbatim in three places. The
+ * install path runs pnpm's peer resolution over the `@deepseek-ai/dsh*` peers,
+ * and the 0.2.1 loader's compatibility check reads `engines.dsh` directly (an
+ * own `engines.dsh` decides alone there), so a copy that drifts is a plugin the
+ * loader refuses to mount. Asserting the three agree keeps the declaration
+ * honest; `dshReleases` records the release actually exercised.
  */
 test('the DSH range states a lower bound only, declared identically three times', () => {
-  assert.equal(manifest.engines.dsh, '>=0.2.0-rc.2')
+  assert.equal(manifest.engines.dsh, '>=0.2.1-rc.2')
   assert.equal(manifest.dsh.compatibility.dsh, manifest.engines.dsh)
   assert.equal(manifest.peerDependencies['@deepseek-ai/dsh-tools'], manifest.engines.dsh)
-  assert.equal(manifest.dsh.compatibility.dshReleases['0.2.0-rc.2'], 'compatible')
+  assert.equal(manifest.dsh.compatibility.dshReleases['0.2.1-rc.2'], 'compatible')
   // No upper bound anywhere: `^`, `~` or `<` would mean re-releasing this
   // plugin every time the harness or a peer bumps a major.
   for (const [name, range] of Object.entries(manifest.peerDependencies)) {

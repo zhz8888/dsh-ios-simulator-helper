@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@zhz8888/dsh-ios-simulator-helper.svg)](https://www.npmjs.com/package/@zhz8888/dsh-ios-simulator-helper)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
-[![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+[![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个**参数表单**，渲染在「插件」页该插件的详情页里（插件 → 已安装插件 → iOS 模拟器助手），让默认设备、运行时、UI 后端、构建参数与输出目录在应用里配置，而不是靠环境变量。
 
@@ -80,16 +80,16 @@ dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # �
 
 ### 版本闸门
 
-DSH 兼容范围是 **`>=0.2.0-rc.2`——只有下界，没有上界**，三处声明逐字一致（`peerDependencies`、`engines.dsh`、`dsh.compatibility.dsh`）：低于下界的运行时会**直接拒绝安装**，同时未来的稳定版都不会被排除。
+DSH 兼容范围是 **`>=0.2.1-rc.2`——只有下界，没有上界**，三处声明逐字一致（`peerDependencies`、`engines.dsh`、`dsh.compatibility.dsh`）：低于下界的运行时会**直接拒绝安装**，同时未来的稳定版都不会被排除。
 
-只有一个 node-semver 细节绕不开：`0.2.1-alpha.1` 这类**新元组的预发布**在 npm/pnpm 的默认规则下不被放行，安装会失败。此时二选一——给范围补一条该元组的分支（`">=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-0"`），或让 pnpm 放宽 peer 校验：
+只有一个 node-semver 细节绕不开：`0.2.2-alpha.1` 这类**新元组的预发布**在 npm/pnpm 的默认规则下不被放行，安装会失败。此时二选一——给范围补一条该元组的分支（`">=0.2.1-rc.2 <0.2.2-0 || >=0.2.2-0"`），或让 pnpm 放宽 peer 校验：
 
 ```bash
 dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
   --config.strict-peer-dependencies=false
 ```
 
-稳定版（`0.2.0`、`0.2.1`、`0.3.0`、`1.0.0`…）不受这个细节影响，一律放行。
+稳定版（`0.2.1`、`0.2.2`、`0.3.0`、`1.0.0`…）不受这个细节影响，一律放行。
 
 ## 配置页面
 

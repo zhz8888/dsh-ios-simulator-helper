@@ -14,7 +14,7 @@ import {
  *
  * The two behaviours worth pinning are the live read (a volatile reference must
  * be unwrapped on every call, not captured once) and the legacy fallback chain
- * (settings page -> `IOS_SIM_*` environment variable -> declared default),
+ * (configuration page -> `IOS_SIM_*` environment variable -> declared default),
  * because the original plugin's users depend on the middle rung.
  */
 
@@ -102,7 +102,7 @@ test('a volatile reference is read fresh on every projection', () => {
   assert.equal(readSettings(config, {}).defaultDevice, 'iPhone 17', 'a settings save must reach the next call')
 })
 
-test('the settings page wins over the environment variable', () => {
+test('the configuration page wins over the environment variable', () => {
   const settings = readSettings(liveConfig({ defaultDevice: 'iPhone Air', uiBackend: 'idb' }), {
     IOS_SIM_DEFAULT_DEVICE: 'iPad',
     IOS_SIM_UI_BACKEND: 'none',

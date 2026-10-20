@@ -5,7 +5,7 @@ import * as primitives from './primitives-double.mjs'
 import { loadBundle } from './load-bundle.mjs'
 
 /**
- * Render the settings page and print a JSON report.
+ * Render the plugin's Plugins-page configuration form and print a JSON report.
  *
  * React is real (`react-dom/server`, so hooks and the element tree are the real
  * thing); the primitives are the double documented in `primitives-double.mjs`,
@@ -24,7 +24,7 @@ const report = {
   failures: [],
   variants: {},
   registered: null,
-  navLabel: undefined,
+  unserved: null,
   fieldKeys: [],
   fieldLabels: [],
   injectKeys: [],
@@ -114,8 +114,15 @@ function fakeConfigForm() {
   }
 }
 
-/** The Cordis-like browser context the bundle's `apply` expects. */
-function fakeContext() {
+/**
+ * The Cordis-like browser context the bundle's `apply` expects.
+ *
+ * @param {{served?: boolean}} [options] - `served: false` models a host that
+ *   does not serve the settings namespace: `whileServed` then never calls back.
+ * @returns {{ctx: object, registered: object}} the context and its registration record.
+ */
+function fakeContext(options = {}) {
+  const served = options.served ?? true
   const form = fakeConfigForm()
   const registered = { component: undefined, options: undefined, slots: [], dictionaries: [] }
   const dictionaries = () => registered.dictionaries.at(-1)?.dictionaries
@@ -126,6 +133,7 @@ function fakeContext() {
         getSnapshot: () => ({ view: { namespaces: [{ ns: 'ios-simulator-helper' }], writable: true } }),
       }),
       whileServed: (namespaces, register) => {
+        if (!served) return () => {}
         const disposer = register(new Set(namespaces))
         return typeof disposer === 'function' ? disposer : () => {}
       },
@@ -230,32 +238,46 @@ try {
   report.failures.push(`HOST_API threw: ${error.message}`)
 }
 
+// A host that does not serve the namespace must render no trace of the form.
+const unserved = fakeContext({ served: false })
+try {
+  exported.apply(unserved.ctx)
+} catch (error) {
+  report.failures.push(`apply() threw without a served namespace: ${error.message}`)
+}
+report.unserved = {
+  component: unserved.registered.component !== undefined,
+  slots: [...new Set(unserved.registered.slots)],
+}
+
 if (registered.component === undefined) {
-  report.failures.push('apply() registered no settings section component')
+  report.failures.push('apply() registered no plugin-page configuration component')
 } else {
   const { component, options } = registered
+
+  // The plugin detail page keys a bundle's configuration by the BUNDLE's
+  // package name and draws the title, icon and crumb itself — so the entry
+  // carries neither the settings navigation's label nor its order.
   for (const [key, expected] of [
-    ['name', 'settings.section'],
-    ['id', 'ios-simulator'],
+    ['name', 'plugins.bundle.config'],
+    ['key', '@zhz8888/dsh-ios-simulator-helper'],
     ['locale', 'settings.iosSimulatorHelper'],
   ]) {
     if (options[key] !== expected) {
       report.failures.push(`slot option ${key}=${JSON.stringify(options[key])} (want ${JSON.stringify(expected)})`)
     }
   }
-  if (typeof options.label !== 'function') report.failures.push('slot label must be a thunk so it follows the locale')
-  if (options.order !== 17) report.failures.push(`slot order ${options.order} != 17`)
+  if (options.label !== undefined) report.failures.push('the plugin detail page draws its own title; the entry must not register a label')
 
   let props
   try {
-    props = { t: ctx.locale.bind(options.locale), ...faceToProps(options.inject()), close: () => {} }
+    props = { t: ctx.locale.bind(options.locale), view: 'page', ...faceToProps(options.inject()) }
   } catch (error) {
     report.failures.push(`inject() threw: ${error.message}`)
   }
 
   if (props !== undefined) {
     report.injectKeys = Object.keys(props).sort()
-    report.navLabel = options.label()
     for (const [name, navigatorStub] of Object.entries(NAVIGATORS)) {
       setNavigator(navigatorStub)
       try {
@@ -266,7 +288,7 @@ if (registered.component === undefined) {
       }
     }
     setNavigator(NAVIGATORS.macos)
-    report.registered = { id: options.id, order: options.order }
+    report.registered = { slot: options.name, key: options.key, locale: options.locale, slots: [...new Set(registered.slots)] }
 
     // The staged-form states the action bar reacts to. A server render observes one
     // snapshot, so each state is produced by driving the real model and rendering

@@ -14,7 +14,7 @@ This plugin works only on macOS with full Xcode installed. `xcrun simctl`, `xcod
 
 - If `ios_preflight` reports the `Host OS (macOS)` check as failing, stop immediately and tell the user the plugin only supports macOS. Do not attempt to work around it.
 - Command Line Tools alone are not enough: `xcode-select -p` must point at an Xcode.app developer directory.
-- The same verdict is shown on the DSH **Settings → iOS Simulator** page, which also edits this plugin's parameters.
+- The same verdict is shown on this plugin's page in the DSH **Plugins** panel (Plugins → Installed plugins → iOS Simulator Helper), which also edits its parameters.
 
 ## Tool Names
 
@@ -48,9 +48,9 @@ The tools are registered directly on the agent, without an MCP server prefix, so
 - `ios_logs` reads `log show` output for the recent window (120 seconds by default); narrow it with `bundleId`, `seconds`, and `limit` instead of dumping everything.
 - Screenshots land under the plugin data directory (`$DSH_HOME/ios-simulator-helper/screenshots` by default) unless `path` is passed; the returned `path` is relative to the session workspace.
 
-## Settings
+## Configuration
 
-Everything configurable lives on **Settings → iOS Simulator** (profile-scoped, applied on the next tool call):
+Everything configurable lives on this plugin's page in the **Plugins** panel (Plugins → Installed plugins → iOS Simulator Helper; profile-scoped, applied on the next tool call):
 
 - **Simulator and device** — default device and runtime fragments, whether a simulator is booted automatically, whether the simulator window app opens automatically, boot timeout.
 - **UI automation** — `uiBackend` (`auto` / `idb` / `xcodebuildmcp` / `none`), the `idb` executable, per-command timeout.

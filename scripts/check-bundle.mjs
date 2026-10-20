@@ -34,7 +34,7 @@ if (registration.id !== manifest.name) {
 if (!Array.isArray(exported.inject) || exported.inject.length === 0) {
   fail('the client bundle must export a non-empty inject list')
 }
-for (const name of ['apply', 'inject', 'NS', 'FIELD_META', 'HOST_API']) {
+for (const name of ['apply', 'inject', 'NS', 'FIELD_META', 'HOST_API', 'PLUGIN_SURFACE']) {
   if (exported[name] === undefined) fail(`the client bundle must export ${name}`)
 }
 
@@ -45,6 +45,40 @@ if (exported.NS !== SETTINGS_NAMESPACE) {
 const patch = readFileSync(path.join(ROOT, 'cordis.patch.yml'), 'utf8')
 if (!patch.includes(`id: ${SETTINGS_NAMESPACE}`)) {
   fail(`cordis.patch.yml must mount a row whose id is ${SETTINGS_NAMESPACE}`)
+}
+
+// --- plugin surface agreement ---------------------------------------------
+// The form is not a Settings dialog section any more: it is a bundle's own
+// configuration on the Plugins page, in the `plugins.bundle.config` keyed slot.
+// That slot is keyed by the BUNDLE's package name — the value the plugin
+// manager's inventory compares against — so the key is the package name and
+// never the settings namespace above. The namespace stays load-bearing as the
+// patch row id whose live form the page binds to.
+const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
+const surface = exported.PLUGIN_SURFACE
+if (surface === undefined) {
+  fail('the client bundle must export PLUGIN_SURFACE')
+} else {
+  if (surface.slot !== 'plugins.bundle.config') {
+    fail(`the form must register into plugins.bundle.config, not ${JSON.stringify(surface.slot)}`)
+  }
+  if (surface.key !== manifest.name) {
+    fail(
+      `the plugins.bundle.config key ${JSON.stringify(surface.key)} must equal the package name ${JSON.stringify(manifest.name)}`,
+    )
+  }
+}
+const packageNameConstant = /const PACKAGE_NAME = "([^"]+)"/.exec(clientSource)
+if (packageNameConstant === null) {
+  fail('lib/client.js must declare PACKAGE_NAME for the plugins.bundle.config key')
+} else if (packageNameConstant[1] !== manifest.name) {
+  fail(`lib/client.js PACKAGE_NAME ${JSON.stringify(packageNameConstant[1])} must equal the package name ${JSON.stringify(manifest.name)}`)
+}
+if (!clientSource.includes('name: "plugins.bundle.config"')) {
+  fail('lib/client.js must register into plugins.bundle.config')
+}
+if (clientSource.includes('"settings.section"')) {
+  fail('lib/client.js must not register into the Settings dialog: plugin pages live on the Plugins page')
 }
 
 // --- field table agreement -------------------------------------------------
@@ -77,7 +111,6 @@ for (const field of clientFields) {
 
 // --- route agreement -------------------------------------------------------
 const hostSource = readFileSync(path.join(ROOT, 'lib', 'index.js'), 'utf8')
-const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
 const hostPrefix = /const ROUTE_PREFIX = '([^']+)'/.exec(hostSource)?.[1]
 if (hostPrefix === undefined) {
   fail('lib/index.js must declare ROUTE_PREFIX')
@@ -129,5 +162,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `check-bundle: OK — bundle id, namespace, ${clientFields.length} fields, 3 routes, the macOS gate and script hygiene all agree.`,
+  `check-bundle: OK — bundle id, namespace, plugin surface, ${clientFields.length} fields, 3 routes, the macOS gate and script hygiene all agree.`,
 )

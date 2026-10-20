@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { readSettings } from '../lib/settings.js'
@@ -11,7 +12,7 @@ import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulato
 import { clampLimit, clampSeconds } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
 import { macroSandboxDenied, pickAppProduct } from '../lib/providers/build.js'
-import { preflight } from '../lib/providers/preflight.js'
+import { PAGE_LOCATION, preflight } from '../lib/providers/preflight.js'
 import { status as uiStatus, unavailableMessage } from '../lib/providers/ui.js'
 
 /**
@@ -386,4 +387,15 @@ test('only a nested macro sandbox failure triggers the sandbox retry', () => {
   assert.equal(macroSandboxDenied('error: cannot find type "Foo" in scope'), false)
   assert.equal(macroSandboxDenied(''), false)
   assert.equal(macroSandboxDenied(undefined), false)
+})
+
+test('the diagnostic fix hints name the plugin page in the Plugins panel', () => {
+  // Both hints used to send the user to the Settings dialog — a location that
+  // no longer holds them after the form moved to the plugin detail view. The
+  // phrase is one exported constant so a stale instruction is a test failure,
+  // and each interpolation is counted so a hand-written replacement is caught.
+  assert.match(PAGE_LOCATION, /Plugins panel/)
+  assert.match(PAGE_LOCATION, /iOS Simulator Helper/)
+  const source = readFileSync(new URL('../lib/providers/preflight.js', import.meta.url), 'utf8')
+  assert.equal((source.match(/\$\{PAGE_LOCATION\}/g) ?? []).length, 2, 'both fix hints must interpolate PAGE_LOCATION')
 })

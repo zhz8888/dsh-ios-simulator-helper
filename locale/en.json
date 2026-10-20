@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "iOS Simulator Helper",
-    "description": "Unofficial helper for Apple's iOS Simulator: 21 native ios_* tools covering Xcode project discovery, build, install, launch, screenshots and logs, plus a settings page for the simulator, the idb backend and xcodebuild. Not affiliated with Apple."
+    "description": "Unofficial helper for Apple's iOS Simulator: 21 native ios_* tools covering Xcode project discovery, build, install, launch, screenshots and logs, plus the simulator, idb backend and xcodebuild parameters on this plugin's page in the Plugins panel. Not affiliated with Apple."
   }
 }

@@ -90,10 +90,16 @@ test('declares the bundle patch and a web client half', () => {
   assert.equal(manifest.dsh.name, 'ios-simulator-helper')
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
   assert.equal(manifest.dsh.client.platform, 'web')
-  assert.deepEqual(manifest.dsh.client.inject, [
+  // The form registers into the Plugins page's slot, which the plugin-manager
+  // client module declares; naming it here is what orders that module before
+  // this bundle's browser half. `ui-settings` is what serves `configForms`.
+  for (const module of [
     '@deepseek-ai/dsh-client-locale',
+    '@deepseek-ai/dsh-client-ui-plugin-manager',
     '@deepseek-ai/dsh-client-ui-settings',
-  ])
+  ]) {
+    assert.ok(manifest.dsh.client.inject.includes(module), `dsh.client.inject must name ${module}`)
+  }
 })
 
 test('pins the DSH releases the host half is built against', () => {

@@ -6,13 +6,13 @@ import { promisify } from 'node:util'
 import { ROOT } from './helpers/load-bundle.mjs'
 
 /**
- * Render the settings page with real React.
+ * Render the plugin's Plugins-page configuration form with real React.
  *
- * The page is the artifact a port most easily gets wrong: a missing dictionary
+ * The form is the artifact a port most easily gets wrong: a missing dictionary
  * key, a field the host never sends, an `inject` face that does not match what
  * the slot renderer calls, or an uncontrolled input. Rendering it through
  * `react-dom/server` turns all of those into a failing test instead of a broken
- * Settings panel.
+ * plugin detail page.
  *
  * React is real. `@deepseek-ai/dsh-client-ui-primitives` is doubled, because the
  * shipped package is a browser bundler input (`*.module.css`, `simple-icons`,
@@ -26,7 +26,7 @@ import { ROOT } from './helpers/load-bundle.mjs'
 
 const run = promisify(execFile)
 
-/** Render once per host scenario; the page is deterministic for a fixed snapshot. */
+/** Render once per host scenario; the form is deterministic for a fixed snapshot. */
 async function renderPage() {
   const { stdout } = await run(process.execPath, [path.join(ROOT, 'test', 'helpers', 'render-page.mjs')], {
     cwd: ROOT,
@@ -37,17 +37,30 @@ async function renderPage() {
 
 const report = await renderPage()
 
-test('the settings page renders without throwing on every host', () => {
+test('the configuration form renders without throwing on every host', () => {
   assert.deepEqual(report.failures, [])
   for (const [host, markup] of Object.entries(report.variants)) {
-    assert.ok(markup.length > 1000, `the ${host} page must render real markup`)
+    assert.ok(markup.length > 1000, `the ${host} form must render real markup`)
   }
 })
 
-test('the page registers the slot entry the settings shell expects', () => {
-  assert.deepEqual(report.registered, { id: 'ios-simulator', order: 17 })
+test('the form registers into the plugin detail page, not the Settings page', () => {
+  // A plugin's own configuration belongs on the Plugins page: the
+  // `plugins.bundle.config` slot is keyed by the BUNDLE's package name, and the
+  // page renders the entry inside the plugin detail. `settings.section` still
+  // renders, but registering there as well would give the plugin two
+  // configuration pages — this form must name exactly one slot.
+  assert.equal(report.registered.slot, 'plugins.bundle.config')
+  assert.equal(report.registered.key, '@zhz8888/dsh-ios-simulator-helper')
+  assert.equal(report.registered.locale, 'settings.iosSimulatorHelper')
+  assert.deepEqual(report.registered.slots, ['plugins.bundle.config'])
+})
+
+test('the injected face carries the form actions and the view the page asks for', () => {
+  // The page asks for `view: 'page'`; there is no summary view for a bundle's
+  // own configuration, and the form needs no `label` of its own because the
+  // page draws the title.
   assert.deepEqual(report.injectKeys, [
-    'close',
     'discard',
     'edit',
     'loadHost',
@@ -57,11 +70,8 @@ test('the page registers the slot entry the settings shell expects', () => {
     'save',
     't',
     'useIosSimulatorSettings',
+    'view',
   ])
-})
-
-test('the section label is a locale-following thunk returning the nav text', () => {
-  assert.equal(report.navLabel, 'iOS Simulator')
 })
 
 test('every field group is rendered with its heading and hint', () => {
@@ -79,8 +89,28 @@ test('the controls carry the values the host serves, not placeholders', () => {
   assert.match(markup, /<option value="idb">/)
 })
 
-test('the page is headed by the plugin name, not only by the nav label', () => {
-  assert.match(report.variants.macos, /<h2 class="ismh_title">iOS Simulator Helper<\/h2>/)
+test('an overridden value shows the badge and its reset control', () => {
+  // The fake host stores a user override for one field, so the shared form
+  // marks it and offers the reset. Both are harness behaviour, but the form is
+  // what has to place them inside the field frame.
+  assert.match(report.variants.macos, />Overridden</)
+  assert.match(report.variants.macos, />Reset to default</)
+})
+
+test('a host that does not serve the namespace renders no form at all', () => {
+  // The registration hangs off `whileServed`, so a deployment without the host
+  // half must not leave a slot entry behind.
+  assert.equal(report.unserved.component, false, 'no component when the namespace is not served')
+  assert.deepEqual(report.unserved.slots, [], 'no slot may be injected when the namespace is not served')
+})
+
+test('the form draws no title of its own; the plugin detail page owns the chrome', () => {
+  // The page draws the plugin's title, icon, crumb and description above this
+  // section. Repeating any of that here would render the plugin's name twice on
+  // one screen, so the form contributes an effect note and the category cards.
+  assert.ok(!report.variants.macos.includes('ismh_title'), 'the form must not draw its own title')
+  assert.ok(!/<h[12]\b/.test(report.variants.macos), 'the form must start at section headings')
+  assert.match(report.variants.macos, /Changes are saved to this profile and take effect on the next tool call\./)
 })
 
 test('every category is its own card', () => {

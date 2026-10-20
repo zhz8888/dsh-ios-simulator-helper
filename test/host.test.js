@@ -214,7 +214,10 @@ test('the /ios-dev command runs the diagnostic and reports a verdict', async () 
   const result = await command.handler({ rawInput: 'build and screenshot the app' })
   assert.ok(['success', 'error'].includes(result.kind), `unexpected kind: ${result.kind}`)
   assert.match(result.text, /iOS Simulator environment/)
-  assert.match(result.text, /Settings -> iOS Simulator page/)
+  // The report used to point at Settings -> iOS Simulator; the form now lives
+  // on the plugin's detail view in the Plugins panel.
+  assert.match(result.text, /Environment values are edited on this plugin's page in the Plugins panel/)
+  assert.match(result.text, /Plugins → Installed plugins → iOS Simulator Helper/)
 })
 
 test('the command report names the macOS requirement on an unsupported host', () => {

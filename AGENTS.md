@@ -9,10 +9,10 @@ Working notes for coding agents in this repository. Everything below is specific
 | Piece | Detail |
 |---|---|
 | Tools | 21 native `ios_*` tools: project discovery/scaffolding, simulator boot/install/launch/terminate, screenshots, logs, optional `idb` UI automation. 20 keep the original names and arguments; `ios_shutdown_simulator` is added. |
-| Settings page | Settings → iOS Simulator: 17 fields in 5 groups, editable live through `ctx.configForms`. |
+| Configuration page | Rendered on the plugin's own detail view in the Plugins panel (`plugins.bundle.config`, keyed by the package name): 17 fields in 5 groups, editable live through `ctx.configForms`. The Settings dialog carries no section for this plugin. |
 | Skill / command | Bundled `ios-dev` skill (`skills/ios-dev/SKILL.md`) and a `/ios-dev [goal]` command that runs the environment diagnostic. |
 | Host | macOS only, with full Xcode. Every Apple-tooling call refuses elsewhere; `ios_preflight` reports the failed host check instead, and the pure-filesystem tools (`ios_discover_project`, `ios_create_app`) plus `ios_ui_status` still answer. |
-| Package | Two halves: `lib/index.js` (host, Cordis) and `lib/client.js` (browser bundle for the settings page). |
+| Package | Two halves: `lib/index.js` (host, Cordis) and `lib/client.js` (browser bundle for the configuration page). |
 
 The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/`, not the package name — the title names this plugin, not the Apple product it drives, and the descriptions carry the non-affiliation line. The settings namespace, the `cordis.patch.yml` row id and the route prefix are all `ios-simulator-helper`.
 
@@ -20,7 +20,7 @@ The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `l
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 105 tests, no Xcode and no simulator needed
+pnpm test                    # 108 tests, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount
 pnpm run verify:mount        # real Cordis Context + real ToolRuntime; hermetic unless --with-simulator
@@ -44,7 +44,7 @@ cordis.patch.yml      the one `insert` row that mounts the host half
 ios-simulator.png     plugin icon: the ZCode plugin's artwork at 192 px, its grey backdrop keyed out (test decodes it)
 locale/en.json        plugin-page title/description; its presence is what enables the other languages
 locale/zh.json        the Simplified Chinese pair
-README.md             the user document (English, primary): install, settings, tools, limitations
+README.md             the user document (English, primary): install, configuration, tools, limitations
 README.zh-CN.md       its structural Simplified Chinese mirror
 lib/index.js          host half: tools, skill, command, the three Fetch routes, settings policy
 lib/client.js         browser half: a hand-written __ModuleLoader__ bundle — there is no build step
@@ -65,7 +65,7 @@ screenshots.json      the market-facing list of those four images (relative path
 These are load-bearing. Some fail at the loader, some fail silently in a UI.
 
 1. **The package name is the client module id.** `package.json` `name` = `id:` in `lib/client.js` = the `name:` of the row in `cordis.patch.yml`. `scripts/check-bundle.mjs` compares the first two.
-2. **One settings namespace.** The patch row id = `SETTINGS_NAMESPACE` in `lib/settings.js` = the literal in `lib/client.js` = the `/api/ios-simulator-helper` route prefix. Changing it means changing all four, and existing profiles keep their saved values keyed by the old id.
+2. **One settings namespace, one plugin-surface key.** The patch row id = `SETTINGS_NAMESPACE` in `lib/settings.js` = the literal in `lib/client.js` = the `/api/ios-simulator-helper` route prefix. Changing it means changing all four, and existing profiles keep their saved values keyed by the old id. The form does **not** register under this namespace: it registers into the Plugins page's `plugins.bundle.config` slot, keyed by the **package name** (the value the plugin manager's inventory compares against), and `scripts/check-bundle.mjs` compares that key and `PACKAGE_NAME` with `package.json`.
 3. **The browser half is a classic script, not a module.** It may only `require` the shell's nine static modules — `react`, `react/jsx-runtime`, `react-dom`, `react-dom/client`, `@deepseek-ai/cordis`, `@deepseek-ai/dsh-client-store`, `@deepseek-ai/dsh-client-ui-slots`, `@deepseek-ai/dsh-client-ui-primitives`, `@deepseek-ai/dsh-client-ui-dockkit` (the table in `test/helpers/load-bundle.mjs`) — and must never import a host module. Editing `lib/client.js` edits what ships — nothing compiles it.
 4. **Two field tables must agree.** `lib/settings.js` (host) and the mirrored metadata in `lib/client.js` are compared key by key and option by option by the consistency gate. Change one, change both.
 5. **Platform logic lives in one place**: `lib/providers/host.js`. The platform is an injectable parameter so the non-macOS branch is testable on a Mac.
@@ -78,15 +78,15 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 ## Changing things safely
 
 - **A tool** — add it in `lib/tools/index.js` with an argument and result schema. The count is pinned in five places, so the gate fails until all agree: `test/host.test.js` and `scripts/verify-mount.mjs` (both `21`), the `description` of `locale/en.json` and `locale/zh.json`, and the README's tool list. `verify-mount.mjs` also dispatches `ios_discover_project` through the real registry and validates its JSON — keep any new tool that shells out to Apple out of its default dispatch, because the gate runs on every change and loading must not start the simulator stack.
-- **A settings field** — both field tables, then every place the count is pinned: `test/settings.test.js` ("17 fields in 5 groups"), `test/client-render.test.js` (field count and registration order), `scripts/verify-mount.mjs` (volatile count), and the README settings table. The gate fails on drift.
+- **A settings field** — both field tables, then every place the count is pinned: `test/settings.test.js` ("17 fields in 5 groups"), `test/client-render.test.js` (field count and slot registration), `scripts/verify-mount.mjs` (volatile count), and the README settings table. The gate fails on drift.
 - **A provider** — keep the ported behaviour; the parsers are covered by `test/providers.test.js`. Anything that needs a Mac belongs in `scripts/smoke.mjs`, not in `test/`.
 - **The window app** — Xcode 26 replaced `Simulator.app` with Device Hub (`com.apple.dt.Devices`, under `Contents/Applications`), so `open -a Simulator` alone is dead on a current Xcode. `lib/providers/sim.js` is the only place that resolves it, opening the window is best-effort there (its failure is returned as `openWarning`, never thrown out of `boot`), and `ios_show_simulator` is the only tool for which opening the window *is* the operation.
-- **The settings page** — `test/client-render.test.js` renders it with real React and `react-dom/server` in four host scenarios (macOS, Linux, Windows, undetectable), drives the real form model into the dirty and invalid states the action bar reacts to, and asserts every dictionary key resolves.
+- **The configuration page** — `test/client-render.test.js` renders the form with real React and `react-dom/server` in four host scenarios (macOS, Linux, Windows, undetectable), pins the `plugins.bundle.config` slot and key, covers a host that does not serve the namespace (which must leave no slot entry), drives the real form model into the dirty and invalid states the action bar reacts to, and asserts every dictionary key resolves.
 - **Testing the plugin by hand** — install this directory into a scratch profile (`dsh plugin --profile <scratch> add /absolute/path/to/dsh-ios-simulator-helper`), or through the DSH Desktop plugin manager. Never leave a scratch profile in the repository.
 
 ## Code style
 
-- English everywhere: code, comments, JSDoc, commit messages, `README.md`, and this file. Two translations are deliberate: the settings page's UI strings (`en`/`zh` dictionaries inside the client half) and `README.zh-CN.md`.
+- English everywhere: code, comments, JSDoc, commit messages, `README.md`, and this file. Two translations are deliberate: the configuration page's UI strings (`en`/`zh` dictionaries inside the client half) and `README.zh-CN.md`.
 - `README.md` and `README.zh-CN.md` are structural mirrors — same headings in the same order, same tables, same counts. A change to one is a change to the other. The language switch names the current edition as plain text and links only the other one; a self-link is noise on a page that already is that language.
 - Link repository files relatively in both READMEs — `LICENSE`, `AGENTS.md`, the other edition. npm resolves a relative README target against `repository.url` to `<repo>/blob/HEAD/<path>` (checked against the rendered package page, where `[简体中文](./Readme_zh-CN.md)` becomes `github.com/tj/commander.js/blob/HEAD/Readme_zh-CN.md`), so the same link works on GitHub, on npm and in a clone. Badges, screenshots and the `releases/…` / `issues` URLs stay absolute: those are not file paths, and a relative one is rewritten into a `blob` URL that does not exist.
 - The READMEs are the **user document**: what the plugin is, how to install and configure it, what it does, what it does not. Development, verification, release and repository-shape conventions belong in this file instead, so keep them out of the READMEs — and do not restate here what a reader can work out unaided (how to clone and install from source, what an obviously named file contains).
@@ -130,7 +130,7 @@ of shipping.
 ## Testing
 
 - `node:test` via `pnpm test`; no test framework, no mocking library.
-- The tests are a contract, not a smoke screen: they pin the manifest and patch shape, the two field tables, the settings projection, the ported parsers, and the rendered page.
+- The tests are a contract, not a smoke screen: they pin the manifest and patch shape, the two field tables, the settings projection, the ported parsers, and the rendered configuration form.
 - Render tests use real React and `react-dom/server`; only `@deepseek-ai/dsh-client-ui-primitives` is doubled, because it is a browser bundler input (CSS modules, `simple-icons`, `zustand/vanilla`) that plain Node cannot import.
 - Anything requiring Xcode, `simctl` or `idb` is a `scripts/smoke.mjs` concern and must never become a `pnpm test` requirement.
 - The load is inert: `test/lazy-load.test.js` patches `child_process` before importing the host half, then asserts that importing and mounting it start no subprocess while still registering all 21 tools, the skill, the command and the three routes.
@@ -141,11 +141,11 @@ Four layers, and what each one actually proves:
 | Layer | Command | Proves |
 |---|---|---|
 | Unit / parsers | `pnpm test` | bundle loading contract and static-module limits, manifest and patch contract, settings projection (volatile reads, env fallbacks, out-of-range fallbacks, boolean spellings), and the ported parsers |
-| Settings-page render | `pnpm test` (`client-render.test.js`) | the whole page rendered with real React in four host scenarios (macOS, Linux, Windows, undetectable), every dictionary key resolving, and the "only supports macOS" notice shown exactly on non-macOS |
-| Consistency gate | `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the two field tables agreeing key by key, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
+| Configuration-page render | `pnpm test` (`client-render.test.js`) | the whole form rendered with real React in four host scenarios (macOS, Linux, Windows, undetectable), the `plugins.bundle.config` slot and key pinned, no slot entry when the namespace is not served, every dictionary key resolving, and the "only supports macOS" notice shown exactly on non-macOS |
+| Consistency gate | `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the `plugins.bundle.config` key and `PACKAGE_NAME` = package name with no `settings.section` registration, the two field tables agreeing key by key, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
 | Real host mount | `scripts/verify-mount.mjs` | real Cordis `Context` + real `ToolRuntime`: 21 tools registered, mounting asserted to start no subprocess, `ios_discover_project` dispatched through the registry and schema-validated, malformed arguments and unknown tool names refused, 17 fields volatile, everything unregistered after dispose, and the whole run kept off Apple's tooling (`--with-simulator` adds `ios_preflight` and `ios_list_simulators`) |
 
-`pnpm run smoke` is the read-only half of that: Xcode discovery, actual `simctl` calls, `ios_discover_project`, the settings-page inventory route and `ios_ui_status`. The write path — scaffold a project, compile it, resolve the built product's bundle id, then install / launch / screenshot / logs / terminate / shutdown — is `pnpm run smoke:simulator`.
+`pnpm run smoke` is the read-only half of that: Xcode discovery, actual `simctl` calls, `ios_discover_project`, the configuration page's inventory route and `ios_ui_status`. The write path — scaffold a project, compile it, resolve the built product's bundle id, then install / launch / screenshot / logs / terminate / shutdown — is `pnpm run smoke:simulator`.
 
 ## Commit conventions
 
@@ -201,7 +201,7 @@ The repository is shaped for the [awesome-dsh-plugin](https://github.com/awesome
 
 - `dsh.bundle.patch` → `./cordis.patch.yml`, with `cordis.patch.yml` next to `package.json` and exactly one `insert` row whose id is the settings namespace.
 - Official `@deepseek-ai/*` packages declared as `peerDependencies`, never `dependencies`.
-- `screenshots.json` declaring 1–8 screenshots by relative, `..`-free image paths that all exist (the four live in `assets/`, which is a convention rather than an assertion). Refreshing them is a four-part move, not a file swap: recapture the live page in DSH Desktop at the same four scroll positions (Chinese locale; no save bar, which only appears once an edit is staged), then update `assets/`, the order in `screenshots.json` and the four captions in **both** READMEs together.
+- `screenshots.json` declaring 1–8 screenshots by relative, `..`-free image paths that all exist (the four live in `assets/`, which is a convention rather than an assertion). Refreshing them is a four-part move, not a file swap: recapture the form on the plugin's detail page in DSH harness 0.2.1-rc.2 at the same four scroll positions (Chinese locale; no save bar, which only appears once an edit is staged; keep the component row's local code source below the fold), then update `assets/`, the order in `screenshots.json` and the four captions in **both** READMEs together. A 1598 × 1588 viewport reproduces the existing frames.
 - `repository`, `homepage` and `bugs` pointing at the listed repository.
 
 The submission is a single YAML file in that repository (`data/plugins/zhz8888__dsh-ios-simulator-helper.yml`, with `url`/`name` pointing here, a `description.en` that states only what the code does, and category `dev`); nothing here ships it, and the list's CI rejects repositories younger than 24 hours.

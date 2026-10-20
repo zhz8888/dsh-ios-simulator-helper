@@ -7,11 +7,11 @@
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 [![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
-A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a full **settings page** (Settings → iOS Simulator) that edits the simulator parameters in-app instead of through environment variables.
+A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a **parameter page on the plugin's own detail page** in the Plugins panel (Plugins → Installed plugins → iOS Simulator Helper) that edits the simulator parameters in-app instead of through environment variables.
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
 - 17 settings fields in 5 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
-- The settings page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every tool that drives Apple tooling then refuses with a clear message instead of failing with `spawn xcrun ENOENT`, while `ios_preflight` reports the failing host check and `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer.
+- The parameter page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every tool that drives Apple tooling then refuses with a clear message instead of failing with `spawn xcrun ENOENT`, while `ios_preflight` reports the failing host check and `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer.
 - Published as `@zhz8888/dsh-ios-simulator-helper`; the plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/` rather than the raw package name, and both descriptions say the plugin is unofficial and not affiliated with Apple.
 
 ## Quick start
@@ -26,16 +26,16 @@ On a Mac with full Xcode, at least one iOS runtime and DSH installed:
 
    In DSH Desktop, open **Plugins** and add the same package name there. Reload or restart DSH afterwards.
 
-2. **Check the machine** — open **Settings → iOS Simulator** and press **Run diagnostic**. It runs exactly the checks `ios_preflight` runs (full Xcode, a simulator runtime, `idb`), and prints a fix for anything missing.
+2. **Check the machine** — open **Plugins → Installed plugins → iOS Simulator Helper** and press **Run diagnostic**. It runs exactly the checks `ios_preflight` runs (full Xcode, a simulator runtime, `idb`), and prints a fix for anything missing.
 
-3. **Use it** — ask for what you want ("build and run this project on the iPhone 16 simulator", "screenshot the running app"), or call the 21 `ios_*` tools directly. Everything the tools need is editable on that settings page.
+3. **Use it** — ask for what you want ("build and run this project on the iPhone 16 simulator", "screenshot the running app"), or call the 21 `ios_*` tools directly. Everything the tools need is editable on that page.
 
 ## Contents
 
 - [Quick start](#quick-start)
 - [Requirements](#requirements)
 - [Install](#install)
-- [Settings page](#settings-page)
+- [Configuration page](#configuration-page)
 - [Screenshots](#screenshots)
 - [Tools](#tools)
 - [Skill and slash command](#skill-and-slash-command)
@@ -55,7 +55,7 @@ On a Mac with full Xcode, at least one iOS runtime and DSH installed:
 | Node.js ≥ 22 | The DSH host runtime. |
 | `idb` (optional) | Needed only by the `ios_ui_*` tools. Without it, build/run/screenshot/logs are unaffected. |
 
-`ios_preflight` checks every item above and prints a fix for each failure; the settings page's "Run diagnostic" button runs the same checks.
+`ios_preflight` checks every item above and prints a fix for each failure; the parameter page's "Run diagnostic" button runs the same checks.
 
 ## Install
 
@@ -63,7 +63,7 @@ On a Mac with full Xcode, at least one iOS runtime and DSH installed:
 dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
 ```
 
-**DSH Desktop**: the `desktop` profile belongs to the Electron app — open **Plugins**, add `@zhz8888/dsh-ios-simulator-helper` there, and enable the row it creates. After a reload or restart the page is at **Settings → iOS Simulator**; it only appears while the host half actually serves this plugin's settings namespace.
+**DSH Desktop**: the `desktop` profile belongs to the Electron app — open **Plugins**, add `@zhz8888/dsh-ios-simulator-helper` there, and enable the row it creates. After a reload or restart the form is at **Plugins → Installed plugins → iOS Simulator Helper**; it only appears while the host half actually serves this plugin's settings namespace.
 
 The published tarball contains everything the plugin needs — the host half, the browser bundle, the bundled skill and the `locale/` entries — and nothing is compiled at install time, so no build approval step is involved. `@deepseek-ai/cordis`, `@deepseek-ai/dsh-tools` and `@deepseek-ai/schemastery` are **peer dependencies** provided by the harness, so the plugin pulls in no second copy and has **no runtime dependencies** of its own; DSH's compatibility gate compares the `@deepseek-ai/dsh*` peer ranges against the running version and refuses to install on a mismatch.
 
@@ -91,11 +91,11 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 Stable releases (`0.2.0`, `0.2.1`, `0.3.0`, `1.0.0`, …) are unaffected and always admitted.
 
-## Settings page
+## Configuration page
 
-The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The page reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness. It is one card per category, built from the same field kit as the built-in settings pages (`@deepseek-ai/dsh-client-ui-primitives`); the three timeouts are entered in whole seconds, while the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
+The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The form registers with the Plugins page's `plugins.bundle.config` slot, keyed by the package name, so it renders inside the plugin's detail page in the Plugins panel instead of in the Settings dialog; it exists only while the host half serves that namespace. It reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness. The detail page draws the plugin's title, icon and description; the form contributes one line saying when an edit takes effect, one card per category — built from the same field kit as the built-in settings pages (`@deepseek-ai/dsh-client-ui-primitives`) — and the save bar. The three timeouts are entered in whole seconds, while the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
 
-Saving happens in a pill that sticks to the bottom of the page: it appears while edits are staged (or a write is in flight, or one failed), names that state next to a status dot, and carries **Discard changes** and **Save** (disabled while a draft is invalid). A draft that merely puts a control back to the value already in effect counts as no edit at all, a confirmation toast reports a write that landed, and leaving the page discards staged edits.
+Saving happens in a pill that sticks to the bottom of the form: it appears while edits are staged (or a write is in flight, or one failed), names that state next to a status dot, and carries **Discard changes** and **Save** (disabled while a draft is invalid). A draft that merely puts a control back to the value already in effect counts as no edit at all, a confirmation toast reports a write that landed, and leaving the page discards staged edits.
 
 | Group | Field | Type | Default | Legacy env fallback | Notes |
 |---|---|---|---|---|---|
@@ -117,7 +117,7 @@ Saving happens in a pill that sticks to the bottom of the page: it appears while
 | Output directories | `dataDir` | text | empty | `IOS_SIM_PLUGIN_DATA` | Root for screenshots, build logs and DerivedData; empty uses `$DSH_HOME/ios-simulator-helper`, then `~/.dsh/ios-simulator-helper`. |
 | | `screenshotDir` | text | empty | `IOS_SIM_SCREENSHOT_DIR` | Empty uses `<data dir>/screenshots`. |
 
-Below the form sit the host check and three buttons:
+Below the form sit the host check and two buttons:
 
 - **Host system** — decided twice: synchronously from the browser's own platform string (so a non-macOS browser sees the notice on first paint, before any request), then authoritatively from the host half's `GET /api/ios-simulator-helper/host`; the host wins on a conflict. When the host is unsupported — or the host never answered and the browser itself is non-macOS — a red notice titled **"This plugin only supports macOS"** appears above the form and names the detected platform.
 - **Run diagnostic** → `GET /api/ios-simulator-helper/status`, the same checks `ios_preflight` runs, listed one by one with status, detail and fix.
@@ -129,23 +129,23 @@ The original plugin's `userConfig` (`default_device`, `ui_backend`) and its envi
 
 ## Screenshots
 
-All four are the live page in DSH Desktop, in the order you scroll it — nothing is mocked up. They show the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the section headings are Chinese while every field name is the same in both languages.
+All four are the live page in DSH harness 0.2.1-rc.2, in the order you scroll it — nothing is mocked up. They show the form inside the plugin's own detail view in the Plugins panel, the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the card headings are Chinese while every field name is the same in both languages.
 
-**1. Simulator and device** — the fields every `ios_*` call reads:
+**1. Simulator and device** — the plugin heading and description, then the fields every `ios_*` call reads:
 
-![The iOS Simulator settings page in DSH Desktop: the simulator-and-device card with the default device, default runtime, auto boot, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
+![The iOS Simulator Helper page in the Plugins panel: the plugin title, version and description, then the simulator-and-device card with the default device, default runtime, auto boot, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI automation and builds** — the `idb` backend and its timeout, then the `xcodebuild` configuration, build timeout and extra arguments:
 
-![The page scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
+![The form scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
 **3. Build tail and logs** — the DerivedData directory and the code-signing switch, then the `ios_logs` window and character limit, and the start of the output directories:
 
-![The page scrolled further: the DerivedData directory and code signing during builds, then the default log window and character limit, and the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![The form scrolled further: the DerivedData directory and code signing during builds, then the default log window and character limit, and the start of the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
 **4. Output directories and the host check** — where screenshots, logs and DerivedData land, then the macOS verdict with the two detection buttons:
 
-![The bottom of the page: the data and screenshot directories, then the host check reading "macOS — supported (darwin/arm64)" with the run-diagnostic and refresh buttons](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
+![The bottom of the form: the data and screenshot directories, then the host check reading "macOS — supported (darwin/arm64)" with the run-diagnostic and refresh buttons](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` lists these four files in this order next to `package.json` in the repository, which is how a plugin market finds them.
 
@@ -180,7 +180,7 @@ Two behaviours deserve their own note:
 
 ## Skill and slash command
 
-- **`ios-dev` skill** — shipped in `skills/ios-dev/` and registered by the host half through `ctx.skills.register()` as an embedded skill with the skill directory as its `resourceBase`. Rewritten for DSH: no `mcp__…` prefix, environment configuration points at the settings page, and the macOS precondition plus the "shut the simulator down when you are done" step are spelled out.
+- **`ios-dev` skill** — shipped in `skills/ios-dev/` and registered by the host half through `ctx.skills.register()` as an embedded skill with the skill directory as its `resourceBase`. Rewritten for DSH: no `mcp__…` prefix, environment configuration points at the plugin's configuration page, and the macOS precondition plus the "shut the simulator down when you are done" step are spelled out.
 - **`/ios-dev [goal]` command** — registered through `ctx.commands.register()`. DSH user commands deliberately never create a model message, so this command does the one thing that is useful without the model: it runs the environment diagnostic and prints the verdict, the failing checks and their fixes.
 
 ## Differences from the original
@@ -188,10 +188,10 @@ Two behaviours deserve their own note:
 | Aspect | Original (ZCode) | This plugin (DSH) |
 |---|---|---|
 | Tool exposure | stdio MCP server `ios-simulator`; the model sees `mcp__ios_simulator__*` | Native `ctx.tools.register()`; the model sees `ios_*` |
-| User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Settings page with 17 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
-| Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()` in front of every Apple-tooling call, plus the settings page's synchronous and authoritative verdicts |
+| User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Configuration page with 17 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
+| Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()` in front of every Apple-tooling call, plus the configuration page's synchronous and authoritative verdicts |
 | Working directory | `process.cwd()` | `exec.agent.session.header.cwd` (the session workspace) |
-| Data directory | `IOS_SIM_PLUGIN_DATA` / temp | `$DSH_HOME/ios-simulator-helper`, configurable on the settings page |
+| Data directory | `IOS_SIM_PLUGIN_DATA` / temp | `$DSH_HOME/ios-simulator-helper`, configurable on the configuration page |
 | Path safety | `inside(cwd, path)` refuses escapes | Same semantics, split into read-only paths (an absolute `.app` is fine) and write targets (must stay inside the session workspace) |
 | Screenshot result | MCP image content (base64) | An image block built from a host attachment reference, degraded to text plus a disk path on refusal |
 | Result normalisation | Providers return objects containing `undefined` | Every tool result passes through `toLosslessJson()` (the registry rejects `undefined`) |
@@ -200,13 +200,13 @@ Two behaviours deserve their own note:
 
 ## Known limitations
 
-- **macOS only.** On any other host `ios_preflight` fails the `Host OS (macOS)` check and skips the remaining probes instead of producing meaningless spawn failures; every tool that drives Apple tooling refuses, `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer, and the settings page keeps the notice at the top.
+- **macOS only.** On any other host `ios_preflight` fails the `Host OS (macOS)` check and skips the remaining probes instead of producing meaningless spawn failures; every tool that drives Apple tooling refuses, `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer, and the configuration page keeps the notice at the top.
 - `ios_ui_*` needs `idb`; `ios_ui_status` explains what is missing. `xcodebuildmcp` is only a reserved value (matching the original's `reservedBackends`) and is not implemented.
 - The original's `ios_build_and_run` always opened the Simulator window; here that is the `autoOpenSimulator` setting (on by default, so behaviour matches). `ios_build_app` and `ios_screenshot` still do not open windows, as in the original. The window app is Simulator.app on Xcode 25 and earlier and Device Hub on Xcode 26 and later; a window that cannot be opened is reported in the result (`opened: false` plus `openWarning`) and never fails the `simctl` steps.
 - `ios_logs` reads `log show` (no live stream), with a configurable and clamped window and length.
 - Swift macros (`@State`, `#Preview`) need `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed. `ios_build_app` then retries the build once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry: true`; a caller that was never sandboxed never sees a retry.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.
-- **The settings page has only been checked by eye in DSH Desktop**: the plugin is installed into the `desktop` profile, and the four shots in `assets/` are the latest manual pass, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are still covered by the render tests, not by eye.
+- **The configuration page has only been checked by eye in DSH Desktop**: the plugin is installed into the `desktop` profile, and the four shots in `assets/` are the latest manual pass, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are still covered by the render tests, not by eye.
 - No credential handling: the plugin never reads or forwards key/token/secret environment variables.
 
 ## Releases

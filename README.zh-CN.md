@@ -7,11 +7,11 @@
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 [![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
-把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个完整的 **设置页面**（设置 → iOS 模拟器），让默认设备、运行时、UI 后端、构建参数与输出目录都能在应用里配置，而不是靠环境变量。
+把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个**参数表单**，渲染在「插件」页该插件的详情页里（插件 → 已安装插件 → iOS 模拟器助手），让默认设备、运行时、UI 后端、构建参数与输出目录在应用里配置，而不是靠环境变量。
 
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
-- 设置页 5 组 17 个字段，全部实时生效；空值按「设置页 → 原插件环境变量 → 内置默认值」顺序回落。
-- 设置页会检测宿主系统：**非 macOS 时直接提示该插件仅支持 macOS**；所有需要调用 Apple 工具链的工具都会以明确的报错拒绝执行，而不是抛出 `spawn xcrun ENOENT`；`ios_preflight` 则报告宿主检查失败，`ios_discover_project`、`ios_create_app` 与 `ios_ui_status` 仍可正常返回。
+- 参数页 5 组 17 个字段，全部实时生效；空值按「参数页 → 原插件环境变量 → 内置默认值」顺序回落。
+- 参数页会检测宿主系统：**非 macOS 时直接提示该插件仅支持 macOS**；所有需要调用 Apple 工具链的工具都会以明确的报错拒绝执行，而不是抛出 `spawn xcrun ENOENT`；`ios_preflight` 则报告宿主检查失败，`ios_discover_project`、`ios_create_app` 与 `ios_ui_status` 仍可正常返回。
 - npm 包名为 `@zhz8888/dsh-ios-simulator-helper`；插件页显示的名称由 `locale/` 提供——英文 **iOS Simulator Helper**、中文 **iOS 模拟器助手**——而不是裸包名，两份描述都注明插件为非官方、与 Apple 无隶属关系。
 
 ## 快速上手
@@ -26,16 +26,16 @@
 
    DSH Desktop 则在左侧「插件」页里添加同一个包名。装完重载或重启 DSH。
 
-2. **检查环境** —— 打开 **设置 → iOS 模拟器**，点「检测环境」。它跑的正是 `ios_preflight` 的那套检查（完整 Xcode、模拟器运行时、`idb`），缺什么就给修复建议。
+2. **检查环境** —— 打开 **插件 → 已安装插件 → iOS 模拟器助手**，点「检测环境」。它跑的正是 `ios_preflight` 的那套检查（完整 Xcode、模拟器运行时、`idb`），缺什么就给修复建议。
 
-3. **开始使用** —— 直接说需求（「把这个工程在 iPhone 16 模拟器上构建并跑起来」「给正在运行的 App 截个图」），或直接调用 21 个 `ios_*` 工具。工具需要的参数都能在那个设置页里改。
+3. **开始使用** —— 直接说需求（「把这个工程在 iPhone 16 模拟器上构建并跑起来」「给正在运行的 App 截个图」），或直接调用 21 个 `ios_*` 工具。工具需要的参数都能在那个页面里改。
 
 ## 目录
 
 - [快速上手](#快速上手)
 - [环境要求](#环境要求)
 - [安装](#安装)
-- [设置页面](#设置页面)
+- [配置页面](#配置页面)
 - [截图](#截图)
 - [工具清单](#工具清单)
 - [Skill 与斜杠命令](#skill-与斜杠命令)
@@ -55,7 +55,7 @@
 | Node.js ≥ 22 | DSH 宿主运行时 |
 | idb（可选） | 仅 `ios_ui_*` 工具需要；未安装时构建/运行/截图/日志链路完全不受影响 |
 
-`ios_preflight` 会逐项检查上述条件并给出修复建议；设置页的「检测环境」按钮运行同一套检查。
+`ios_preflight` 会逐项检查上述条件并给出修复建议；参数页的「检测环境」按钮运行同一套检查。
 
 ## 安装
 
@@ -63,7 +63,7 @@
 dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper
 ```
 
-**DSH Desktop**：`desktop` profile 由 Electron 应用自身管理，在左侧「插件」页里添加 `@zhz8888/dsh-ios-simulator-helper`，再把生成的条目打开即可。重载/重启后页面在 **设置 → iOS 模拟器**；只有 host 半侧真正提供了该设置命名空间时，页面才会出现。
+**DSH Desktop**：`desktop` profile 由 Electron 应用自身管理，在左侧「插件」页里添加 `@zhz8888/dsh-ios-simulator-helper`，再把生成的条目打开即可。重载/重启后表单在 **插件 → 已安装插件 → iOS 模拟器助手**；只有 host 半侧真正提供了该设置命名空间时，表单才会出现。
 
 发布出去的 tarball 里已经包含插件运行所需的一切——host 半侧、浏览器 bundle、随包 skill 与 `locale/` 条目——安装期不编译任何东西，因此不涉及构建授权步骤。`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/schemastery` 是 **peer 依赖**，由 DSH 宿主提供：插件不会装第二份，本包自身也**没有任何运行时依赖**。DSH 的兼容性闸门按 `peerDependencies` 里 `@deepseek-ai/dsh*` 的版本区间与运行时版本比对，不匹配会明确拒装。
 
@@ -91,11 +91,11 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 稳定版（`0.2.0`、`0.2.1`、`0.3.0`、`1.0.0`…）不受这个细节影响，一律放行。
 
-## 设置页面
+## 配置页面
 
-设置命名空间 = profile patch 行 id = `ios-simulator-helper`（同时是 `dsh.name`）。页面通过 `ctx.configForms` 读写，因此具备暂存编辑、脏值检测、内联校验、乐观并发（revision）与「已覆盖/恢复默认」语义。每个分类是一张独立卡片，度量取自内置设置页所用的同一套表单套件（`@deepseek-ai/dsh-client-ui-primitives`）；三个超时均以整秒填写，而旧的 `IOS_SIM_*_MS` 环境变量仍按毫秒读取并自动换算。
+配置命名空间 = profile patch 行 id = `ios-simulator-helper`（同时是 `dsh.name`）。表单注册到插件页的 `plugins.bundle.config` 槽、以包名为键，因此渲染在「插件」页该插件的详情页里，而不是「设置」对话框里；只有当 host 半侧提供该命名空间时它才存在。表单通过 `ctx.configForms` 读写，因此暂存编辑、脏值检测、内联校验、乐观并发（revision）与「已覆盖 / 恢复默认」语义都由 harness 提供。详情页负责绘制插件标题、图标与描述；表单本身只贡献一行「改动何时生效」的说明、每个分组一张卡片——卡片描边就是分组之间的分隔，度量取自内置设置页所用的同一套表单套件（`@deepseek-ai/dsh-client-ui-primitives`）——以及底部粘性保存栏。三个超时均以整秒填写，而旧的 `IOS_SIM_*_MS` 环境变量仍按毫秒读取并自动换算。
 
-保存由一条吸附在页面底部的小药丸条负责：有暂存改动、写入进行中或写入失败时出现，状态点旁写明当前状态，并提供 **放弃改动** 与 **保存**（草稿不合法时保存按钮禁用）。只是把控件改回当前生效值的草稿不算改动；写入成功由一条提示条确认，离开页面会放弃未保存的编辑。
+保存由一条吸附在表单底部的小药丸条负责：有暂存改动、写入进行中或写入失败时出现，状态点旁写明当前状态，并提供 **放弃改动** 与 **保存**（草稿不合法时保存按钮禁用）。只是把控件改回当前生效值的草稿不算改动；写入成功由一条提示条确认，离开页面会放弃未保存的编辑。
 
 | 分组 | 设置项 | 类型 | 默认值 | 原插件环境变量回落 | 说明 |
 |---|---|---|---|---|---|
@@ -117,7 +117,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | 输出目录 | `dataDir` | 文本 | 空 | `IOS_SIM_PLUGIN_DATA` | 截图、构建日志与 DerivedData 的根目录；留空用 `$DSH_HOME/ios-simulator-helper`，其次 `~/.dsh/ios-simulator-helper` |
 | | `screenshotDir` | 文本 | 空 | `IOS_SIM_SCREENSHOT_DIR` | 留空用 `<数据目录>/screenshots` |
 
-页面底部是宿主检测与三个按钮/结果区：
+表单底部是宿主检测与两个按钮/结果区：
 
 - **宿主系统**：页面先用浏览器自身的平台串**同步**判断（因此非 macOS 的浏览器在首屏就能看到提示，不必等请求），再用 host 半侧 `GET /api/ios-simulator-helper/host` 的结论确认；两者冲突时以 host 为准。判定为不支持时——或 host 没有返回、而浏览器自身就是非 macOS 时——页面顶部出现红色提示条：**该插件仅支持 macOS**，并给出检测到的平台名。
 - **检测环境** → `GET /api/ios-simulator-helper/status`，返回与 `ios_preflight` 相同的检查项，逐条显示状态、详情与修复建议。
@@ -129,23 +129,23 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## 截图
 
-四张都是 DSH Desktop 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。展示的是 1.1.0 的卡片式布局与按整秒填写的超时；保存操作条只在有暂存改动时出现，因此这几张里看不到它。截图时窗口用的是中文界面，分区标题为中文，字段名两种语言一致。
+四张都是 DSH harness 0.2.1-rc.2 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。展示的是「插件」页该插件详情页里的参数表单、1.1.0 的卡片式布局与按整秒填写的超时；保存操作条只在有暂存改动时出现，因此这几张里看不到它。截图时窗口用的是中文界面，卡片标题为中文，字段名两种语言一致。
 
-**1. 模拟器与设备** —— 每次 `ios_*` 调用都会读取的字段：
+**1. 模拟器与设备** —— 插件标题与描述，以及每次 `ios_*` 调用都会读取的字段：
 
-![DSH Desktop 里的 iOS 模拟器设置页：模拟器与设备卡片，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
+![「插件」页里的 iOS 模拟器助手：插件标题、版本与描述，接着是模拟器与设备卡片，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI 自动化与构建** —— `idb` 后端与其超时，接着是 `xcodebuild` 的配置、构建超时与额外参数：
 
-![滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
+![表单滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
 **3. 构建尾部与日志** —— DerivedData 目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限，以及输出目录的开头：
 
-![继续向下滚动：DerivedData 目录、构建时禁用代码签名，接着是默认日志窗口与默认日志字符上限，以及数据目录与截图目录](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![表单继续向下滚动：DerivedData 目录、构建时禁用代码签名，接着是默认日志窗口与默认日志字符上限，以及数据目录与截图目录的开头](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
 **4. 输出目录与宿主检测** —— 截图/日志/DerivedData 的落盘位置，然后是 macOS 判定与两个检测按钮：
 
-![页面底部：数据目录与截图目录，以及宿主系统判定为「macOS —— 符合要求（darwin/arm64）」与检测环境、刷新模拟器两个按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
+![表单底部：数据目录与截图目录，以及宿主系统判定为「macOS —— 符合要求（darwin/arm64）」与检测环境、刷新模拟器两个按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` 就在仓库里的 `package.json` 旁边按这个顺序列出四张图，插件市场据此展示。
 
@@ -180,7 +180,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## Skill 与斜杠命令
 
-- **`ios-dev` skill**：随包提供（`skills/ios-dev/`），host 半侧通过 `ctx.skills.register()` 注册为嵌入式 skill，skill 目录作为 `resourceBase`。内容已按 DSH 改写：去掉 `mcp__...` 前缀、把环境配置指向设置页、写明 macOS 前置条件与「用完关闭模拟器」的收尾动作。
+- **`ios-dev` skill**：随包提供（`skills/ios-dev/`），host 半侧通过 `ctx.skills.register()` 注册为嵌入式 skill，skill 目录作为 `resourceBase`。内容已按 DSH 改写：去掉 `mcp__...` 前缀、把环境配置指向插件的配置页面、写明 macOS 前置条件与「用完关闭模拟器」的收尾动作。
 - **`/ios-dev [目标]` 命令**：通过 `ctx.commands.register()` 注册。DSH 的用户命令刻意不产生模型消息，因此该命令做一件不依赖模型的事——跑一遍环境诊断，输出结论、失败项与修复建议。
 
 ## 与原插件的差异
@@ -188,10 +188,10 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | 方面 | 原插件（ZCode） | 本插件（DSH） |
 |---|---|---|
 | 工具暴露 | stdio MCP 服务器 `ios-simulator`，模型看到 `mcp__ios_simulator__*` | 原生 `ctx.tools.register()`，模型看到 `ios_*` |
-| 用户配置 | `plugin.json` 的 `userConfig`（2 项），经环境变量注入 | 设置页 17 字段 + schemastery `Config`，全部 `.volatile()` 实时生效；原环境变量仍作回落 |
-| 宿主检查 | 仅 `ios_preflight` 里检查一次 `process.platform` | 中央化的 `requireMacOS()`：每个需要 Apple 工具链的入口都会先拒绝；设置页同步 + 权威双重判定 |
+| 用户配置 | `plugin.json` 的 `userConfig`（2 项），经环境变量注入 | 配置页面 17 字段 + schemastery `Config`，全部 `.volatile()` 实时生效；原环境变量仍作回落 |
+| 宿主检查 | 仅 `ios_preflight` 里检查一次 `process.platform` | 中央化的 `requireMacOS()`：每个需要 Apple 工具链的入口都会先拒绝；配置页面同步 + 权威双重判定 |
 | 工作目录 | `process.cwd()` | `exec.agent.session.header.cwd`（会话工作区） |
-| 数据目录 | `IOS_SIM_PLUGIN_DATA` / 临时目录 | `$DSH_HOME/ios-simulator-helper`，可在设置页配置 |
+| 数据目录 | `IOS_SIM_PLUGIN_DATA` / 临时目录 | `$DSH_HOME/ios-simulator-helper`，可在配置页面配置 |
 | 路径安全 | `inside(cwd, path)` 拒绝逃逸 | 同一语义；另区分「只读路径」（`ios_install_app` 允许绝对路径）与「写入目标」（必须在会话工作区内） |
 | 截图返回 | MCP image content（base64） | host 附件引用生成的图像块，失败时退化为文本 + 磁盘路径 |
 | 结果归一 | providers 直接返回含 `undefined` 的对象 | 所有工具结果经 `toLosslessJson()` 归一（注册表拒绝 `undefined`） |
@@ -200,13 +200,13 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## 已知限制
 
-- **仅支持 macOS**：非 macOS 上 `ios_preflight` 会把 `Host OS (macOS)` 标为失败并跳过其余探测（不做无意义的 spawn）；所有需要 Apple 工具链的工具都会拒绝执行，`ios_discover_project`、`ios_create_app` 与 `ios_ui_status` 仍可正常返回，设置页顶部常驻提示。
+- **仅支持 macOS**：非 macOS 上 `ios_preflight` 会把 `Host OS (macOS)` 标为失败并跳过其余探测（不做无意义的 spawn）；所有需要 Apple 工具链的工具都会拒绝执行，`ios_discover_project`、`ios_create_app` 与 `ios_ui_status` 仍可正常返回，配置页面顶部常驻提示。
 - `idb` 未安装时 `ios_ui_*` 不可用，`ios_ui_status` 会说明原因；`xcodebuildmcp` 只是保留值（与原插件的 `reservedBackends` 一致），尚未实现。
 - 原插件的 `ios_build_and_run` 会无条件打开 Simulator 窗口；本插件把它交给 `autoOpenSimulator` 设置（默认开，行为与原插件一致），`ios_build_app` / `ios_screenshot` 仍按原语义不主动开窗。窗口应用在 Xcode 25 及更早是 Simulator.app，在 Xcode 26 及以后是 Device Hub；窗口打不开时只在结果里报告（`opened: false` 与 `openWarning`），不会让 `simctl` 步骤失败。
 - `ios_logs` 与原插件一样只做 `log show`（不做实时流），窗口与长度可配置且有上限。
 - Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；调用方本身已在沙箱内时这一步会失败，`ios_build_app` 会自动补上 `OTHER_SWIFT_FLAGS=-disable-sandbox` 重试一次，并在结果里标记 `macroSandboxRetry: true`。从未处于沙箱内的调用方不会触发重试。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。
-- **设置页只在 DSH Desktop 里做过人工目视确认**：插件装在 `desktop` profile，`assets/` 里那四张按顺序就是最近一次手动检查的界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
+- **配置页面只在 DSH Desktop 里做过人工目视确认**：插件装在 `desktop` profile，`assets/` 里那四张按顺序就是最近一次手动检查的界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
 - 插件不触碰凭据：不读取、不转发任何含 key/token/secret 的环境变量。
 
 ## 版本与发布

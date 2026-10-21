@@ -46,6 +46,35 @@ test('every declared field is a volatile node in the Config schema', () => {
   }
 })
 
+test('the projection fills exactly the declared fields, with the type each kind declares', () => {
+  // The `Settings` interface in `lib/settings.js` is written by hand, and
+  // `readSettings` asserts that its result has that shape. This test is where
+  // that assertion is checked: a field added to the table without a matching
+  // interface member — or a kind whose value type drifted — shows up here.
+  const settings = readSettings({}, {})
+  assert.deepEqual(Object.keys(settings).sort(), [...FIELD_KEYS].sort())
+  for (const group of FIELD_GROUPS) {
+    for (const field of group.fields) {
+      const value = settings[field.key]
+      switch (field.kind) {
+        case 'boolean':
+          assert.equal(typeof value, 'boolean', `${field.key} must project a boolean`)
+          break
+        case 'number':
+          assert.equal(typeof value, 'number', `${field.key} must project a number`)
+          break
+        case 'select':
+          assert.equal(typeof value, 'string', `${field.key} must project a string`)
+          assert.ok(field.options.includes(value), `${field.key} must project one of its options`)
+          break
+        default:
+          assert.equal(typeof value, 'string', `${field.key} must project a string`)
+          break
+      }
+    }
+  }
+})
+
 test('defaults are used when nothing is configured', () => {
   const settings = readSettings({}, {})
   assert.equal(settings.defaultDevice, 'iPhone 16')

@@ -1,0 +1,9 @@
+# pnpm 11 reads workspace settings from this file, not from package.json.
+#
+# The override pins the development tree's `@deepseek-ai/cordis` to the version
+# DSH 0.2.1-rc.2 ships. The whole `@deepseek-ai/dsh*` 0.2.1-rc.2 family declares
+# `cordis: ~4.0.5`, so without the override pnpm resolves their peer against
+# 4.0.4 and reports an unmet peer for every package in the family. The
+# *published* peer floor in package.json stays a lower bound only.
+overrides:
+  '@deepseek-ai/cordis': 4.0.5

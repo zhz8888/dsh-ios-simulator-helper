@@ -2,8 +2,8 @@
 import process from 'node:process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { FIELD_KEYS, FIELDS, SETTINGS_NAMESPACE } from '../lib/settings.js'
-import { ROOT, loadBundle } from '../test/helpers/load-bundle.mjs'
+import { FIELD_GROUPS, FIELD_KEYS, FIELDS, SETTINGS_NAMESPACE } from '../lib/settings.js'
+import { ROOT, STATIC_MODULES, loadBundle } from '../test/helpers/load-bundle.mjs'
 
 /**
  * Consistency gate for the browser bundle.
@@ -22,6 +22,59 @@ const failures = []
 /** Record one failed invariant. */
 function fail(message) {
   failures.push(message)
+}
+
+/**
+ * Compare one localized string pair between the host table and the client.
+ *
+ * Both sides carry `{zh, en}`; a missing pair on either side is a difference
+ * too, because a field that lost its hint on one side renders differently in
+ * that language.
+ *
+ * @param {string} subject - what is being compared, for the message.
+ * @param {string} part - the property name, for the message.
+ * @param {{zh: string, en: string} | undefined} host - the host's value.
+ * @param {{zh: string, en: string} | undefined} client - the client's value.
+ */
+function compareLocalized(subject, part, host, client) {
+  if (host === undefined && client === undefined) return
+  if (host === undefined || client === undefined) {
+    fail(
+      `${subject}.${part}: host ${JSON.stringify(host ?? null)} != client ${JSON.stringify(client ?? null)}`,
+    )
+    return
+  }
+  for (const language of ['zh', 'en']) {
+    if (host[language] !== client[language]) {
+      fail(
+        `${subject}.${part}.${language}: host ${JSON.stringify(host[language])}`
+          + ` != client ${JSON.stringify(client[language])}`,
+      )
+    }
+  }
+}
+
+// The externals are checked from the source text, before the bundle is
+// evaluated: the loader's own assertion fires first and would report an
+// undeclared module as a raw stack trace instead of a curated problem. A
+// failure here stops the run, because the loader cannot even evaluate the
+// bundle once an undeclared module is in it.
+const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
+const declaredExternals = new Set(
+  [...clientSource.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)].map((match) => match[1]),
+)
+for (const specifier of declaredExternals) {
+  if (!STATIC_MODULES.includes(specifier)) {
+    fail(
+      `the client bundle requires "${specifier}", which is not a shell static module`
+        + " (add it to dsh.client.external and to the loader's static module table)",
+    )
+  }
+}
+if (failures.length > 0) {
+  console.error(`check-bundle: ${failures.length} problem(s)\n`)
+  for (const message of failures) console.error(`  - ${message}`)
+  process.exit(1)
 }
 
 const { registration, exported, required } = loadBundle()
@@ -54,7 +107,6 @@ if (!patch.includes(`id: ${SETTINGS_NAMESPACE}`)) {
 // manager's inventory compares against — so the key is the package name and
 // never the settings namespace above. The namespace stays load-bearing as the
 // patch row id whose live form the page binds to.
-const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
 const surface = exported.PLUGIN_SURFACE
 if (surface === undefined) {
   fail('the client bundle must export PLUGIN_SURFACE')
@@ -107,6 +159,34 @@ for (const field of clientFields) {
       fail(`field "${field.key}": host options [${hostOptions}] != client options [${clientOptions}]`)
     }
   }
+  // The labels and hints are the bulk of the duplicated table — about 3,600
+  // characters across two languages — and comparing only the keys left every
+  // one of them unchecked. The client therefore publishes the same metadata
+  // the host declares, and the two are compared field by field here.
+  compareLocalized(`field "${field.key}"`, 'label', host.label, field.label)
+  compareLocalized(`field "${field.key}"`, 'hint', host.hint, field.hint)
+  if ((host.placeholder ?? undefined) !== (field.placeholder ?? undefined)) {
+    fail(
+      `field "${field.key}": host placeholder ${JSON.stringify(host.placeholder ?? null)}`
+        + ` != client placeholder ${JSON.stringify(field.placeholder ?? null)}`,
+    )
+  }
+}
+
+// --- group table agreement --------------------------------------------------
+const clientGroups = exported.GROUP_META ?? []
+if (clientGroups.length !== FIELD_GROUPS.length) {
+  fail(`client declares ${clientGroups.length} groups but the host schema declares ${FIELD_GROUPS.length}`)
+} else {
+  for (const [index, host] of FIELD_GROUPS.entries()) {
+    const client = clientGroups[index]
+    if (client.id !== host.id) {
+      fail(`group ${index}: host id ${host.id} != client id ${client.id}`)
+      continue
+    }
+    compareLocalized(`group "${host.id}"`, 'title', host.title, client.title)
+    compareLocalized(`group "${host.id}"`, 'hint', host.hint, client.hint)
+  }
 }
 
 // --- route agreement -------------------------------------------------------
@@ -149,9 +229,14 @@ if (hostInfo?.hostVerdict({ platform: 'linux', supported: false }, { supported: 
 if (/^\s*(import|export)\s/m.test(clientSource)) {
   fail('the client bundle must be a classic script: no import/export statements')
 }
+// The loader already refuses a module outside the shell's static table, so
+// what reaches this point is the set the bundle actually asked for. It is
+// compared against the same table rather than a hand-written subset of it: the
+// subset used to be three entries long, and every other shell module the
+// bundle legitimately needs was only a warning.
 for (const specifier of new Set(required)) {
-  if (!['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'].includes(specifier)) {
-    console.warn(`note: the bundle requires ${specifier}; confirm it is a shell static module or declared in dsh.client.external`)
+  if (!STATIC_MODULES.includes(specifier)) {
+    fail(`the client bundle requires "${specifier}", which is not a shell static module`)
   }
 }
 

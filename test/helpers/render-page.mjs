@@ -208,7 +208,7 @@ const { exported } = loadBundle({
 })
 
 report.fieldKeys = (exported.FIELD_META ?? []).map((field) => field.key)
-report.fieldLabels = (exported.FIELD_META ?? []).map((field) => field.label).filter(Boolean)
+report.fieldLabels = (exported.FIELD_META ?? []).map((field) => field.label?.en).filter(Boolean)
 
 try {
   exported.apply(ctx)

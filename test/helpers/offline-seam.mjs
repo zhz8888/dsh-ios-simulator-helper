@@ -67,6 +67,7 @@ const DEVICES = {
 const ANSWERS = [
   { argv: 'xcode-select -p', stdout: `${DEVELOPER_DIR}\n` },
   { argv: 'xcodebuild -version', stdout: 'Xcode 27.1\nBuild version 27A1\n' },
+  { argv: 'sw_vers -productVersion', stdout: '27.1\n' },
   { argv: 'xcrun simctl help', stdout: 'Simulator control\nUsage: simctl [--set <path>] <subcommand>\n' },
   { argv: 'xcrun simctl list runtimes --json', stdout: JSON.stringify(RUNTIMES) },
   { argv: 'xcrun simctl list devices --json', stdout: JSON.stringify(DEVICES) },

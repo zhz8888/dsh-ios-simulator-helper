@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 // Before the plugin, deliberately. `lib/util/run.js` takes `spawn` as an ESM
@@ -167,7 +167,17 @@ test('the required arguments the original marked as required stay required', () 
 test('the shared target arguments are present on every device-targeted tool', () => {
   const { registered } = mount()
   const byName = new Map(registered.tools.map((tool) => [tool.name, tool]))
-  for (const name of ['ios_boot_simulator', 'ios_build_and_run', 'ios_screenshot', 'ios_logs', 'ios_ui_describe']) {
+  for (const name of [
+    'ios_boot_simulator',
+    'ios_build_and_run',
+    'ios_screenshot',
+    'ios_logs',
+    'ios_ui_tap',
+    'ios_ui_swipe',
+    'ios_ui_type_text',
+    'ios_ui_button',
+    'ios_ui_describe',
+  ]) {
     for (const field of ['udid', 'device', 'runtime']) {
       assert.ok(byName.get(name).parameters.properties[field] !== undefined, `${name}.${field} missing`)
     }
@@ -263,6 +273,152 @@ test('a project in a subdirectory is found with its schemes', async () => {
   }
 })
 
+test('ios_create_app refuses to overwrite existing files unless asked', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-create-guard-'))
+  try {
+    const { create } = await import('../lib/providers/project.js')
+    const { createRuntime } = await import('../lib/runtime.js')
+    const rt = createRuntime({
+      config: { dataDir: root },
+      exec: { agent: { session: { header: { cwd: root } } } },
+      logger: { info() {}, warn() {}, error() {} },
+    })
+    const first = await create(rt, { name: 'Guard' })
+    await assert.rejects(() => create(rt, { name: 'Guard' }), /Refusing to overwrite existing iOS app files/)
+    const again = await create(rt, { name: 'Guard', overwrite: true })
+    assert.equal(again.project, first.project)
+    assert.equal(again.bundle, first.bundle)
+    assert.equal(again.files.length, 2)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('ios_create_app refuses a dangling symlink instead of writing through it', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-create-symlink-'))
+  const outside = path.join(root, 'outside.swift')
+  try {
+    const { create } = await import('../lib/providers/project.js')
+    const { createRuntime } = await import('../lib/runtime.js')
+    const rt = createRuntime({
+      config: { dataDir: root },
+      exec: { agent: { session: { header: { cwd: root } } } },
+      logger: { info() {}, warn() {}, error() {} },
+    })
+    await mkdir(path.join(root, 'Sym', 'Sym'), { recursive: true })
+    await symlink(outside, path.join(root, 'Sym', 'Sym', 'SymApp.swift'))
+    await assert.rejects(() => create(rt, { name: 'Sym' }), /Refusing to overwrite existing iOS app files/)
+    const { access } = await import('node:fs/promises')
+    await assert.rejects(() => access(outside), 'a dangling link must not be followed')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('ios_logs renders the log as text, not as a JSON envelope', () => {
+  const { registered } = mount()
+  const logs = registered.tools.find((tool) => tool.name === 'ios_logs')
+  const blocks = logs.output.render({}, {
+    simulator: { name: 'iPhone Duo', udid: 'UDID' },
+    seconds: 60,
+    bundleId: null,
+    limit: 20000,
+    characters: 5,
+    truncated: false,
+    output: 'hello',
+  })
+  assert.equal(blocks.length, 1)
+  assert.equal(blocks[0].type, 'text')
+  assert.match(blocks[0].text, /bundleId: \(none\)/)
+  assert.match(blocks[0].text, /\n\nhello$/)
+})
+
+test('discovery drops build-setting bundle ids that are not identifiers', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-bundle-ids-'))
+  try {
+    const projectDir = path.join(root, 'Var.xcodeproj')
+    await mkdir(projectDir, { recursive: true })
+    await writeFile(
+      path.join(projectDir, 'project.pbxproj'),
+      [
+        'PRODUCT_BUNDLE_IDENTIFIER = com.acme.$(PRODUCT_NAME:rfc1034identifier);',
+        'PRODUCT_BUNDLE_IDENTIFIER = com.example.real;',
+        '',
+      ].join('\n'),
+      'utf8',
+    )
+    const { discover } = await import('../lib/providers/project.js')
+    const { createRuntime } = await import('../lib/runtime.js')
+    const rt = createRuntime({
+      config: {},
+      exec: { agent: { session: { header: { cwd: root } } } },
+      logger: { info() {}, warn() {}, error() {} },
+    })
+    const found = await discover(rt)
+    assert.deepEqual(found.bundleIds, ['com.example.real'], 'an unexpanded build setting is not a bundle id')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('an explicit project asks for its own schemes instead of guessing from the file name', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-explicit-scheme-'))
+  try {
+    const { source } = await import('../lib/providers/project.js')
+    const { createRuntime } = await import('../lib/runtime.js')
+    const rt = createRuntime({
+      config: {},
+      exec: { agent: { session: { header: { cwd: root } } } },
+      logger: { info() {}, warn() {}, error() {} },
+    })
+    const found = {
+      projects: ['First.xcodeproj', 'Second.xcodeproj'],
+      workspaces: [],
+      schemes: ['First'],
+    }
+    const src = await source(rt, { project: 'Second.xcodeproj' }, found)
+    assert.equal(src.file, 'Second.xcodeproj')
+    assert.equal(src.scheme, 'Second', 'the second project has its own xcodebuild -list answer')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a blank URL is refused before a simulator is booted', async () => {
+  const { registered } = mount()
+  const open = registered.tools.find((tool) => tool.name === 'ios_open_url')
+  const before = seam.commands.length
+  await assert.rejects(() => open.execute({ url: '   ' }, { signal: undefined }), /A url is required/)
+  assert.deepEqual(seam.commands.slice(before), [], 'a refused call must not touch a simulator')
+})
+
+test('a UI action without a backend refuses before booting', async () => {
+  const { registered } = mount()
+  const tap = registered.tools.find((tool) => tool.name === 'ios_ui_tap')
+  const before = seam.commands.length
+  await assert.rejects(() => tap.execute({ x: 1, y: 2 }, { signal: undefined }), /UI automation backend unavailable/)
+  const reached = seam.commands.slice(before)
+  assert.deepEqual(reached.filter((command) => command.includes('simctl')), [], 'no simulator command may run')
+  assert.ok(reached.includes('idb --version'), 'the availability probe is what refused the call')
+})
+
+test('a UI action refuses a non-positive duration before any probe', async () => {
+  const { registered } = mount()
+  const tap = registered.tools.find((tool) => tool.name === 'ios_ui_tap')
+  const before = seam.commands.length
+  await assert.rejects(() => tap.execute({ x: 1, y: 2, duration: -1 }, { signal: undefined }), /positive number/)
+  assert.deepEqual(seam.commands.slice(before), [])
+})
+
+test('a workspace-relative data directory is labelled instead of resolved against the process cwd', async () => {
+  const fake = fakeContext(['tools', 'connection'])
+  plugin.apply(fake.ctx, { dataDir: 'plugin-data' })
+  const route = fake.registered.routes.find((item) => item.path.endsWith('/inventory'))
+  const response = await route.fetch()
+  const body = await response.json()
+  assert.match(body.current.dataRoot, /plugin-data \(relative to each session workspace\)/)
+})
+
 test('the bundled skill is registered with its body and resource directory', () => {
   const { registered } = mount()
   assert.equal(registered.skills.length, 1)
@@ -280,7 +436,15 @@ test('the /ios-dev command runs the diagnostic and reports a verdict', async () 
   const command = registered.commands[0]
   assert.equal(command.name, 'ios-dev')
   const result = await command.handler({ rawInput: 'build and screenshot the app' })
-  assert.ok(['success', 'error'].includes(result.kind), `unexpected kind: ${result.kind}`)
+  // The seam reports a complete macOS environment, so on a Mac the verdict is
+  // ready. Accepting either kind hid a regression to "not ready".
+  if (process.platform === 'darwin') {
+    assert.equal(result.kind, 'success', 'the seam answers a ready diagnostic')
+    assert.match(result.text, /environment: ready\./)
+  } else {
+    assert.equal(result.kind, 'error')
+    assert.match(result.text, /unsupported host/)
+  }
   assert.match(result.text, /iOS Simulator environment/)
   // The report used to point at Settings -> iOS Simulator; the form now lives
   // on the plugin's detail view in the Plugins panel.
@@ -425,13 +589,17 @@ test('a path escaping the session workspace is refused by the tool body', async 
   }
 })
 
-test('settings namespace fields reach the tool layer through the live config', async () => {
-  const { registered } = mount()
-  const status = registered.tools.find((tool) => tool.name === 'ios_ui_status')
+test('settings fields reach the tool layer through the live config', async () => {
+  // The default config makes every assertion below true whatever the wiring
+  // does; a non-default value is what proves config -> readSettings -> result.
+  const fake = fakeContext(['tools'])
+  plugin.apply(fake.ctx, { uiBackend: 'none' })
+  const status = fake.registered.tools.find((tool) => tool.name === 'ios_ui_status')
   const value = await status.execute({}, { signal: undefined })
-  assert.equal(typeof value.available, 'boolean')
+  assert.equal(value.setting, 'none')
+  assert.equal(value.backend, 'none')
+  assert.equal(value.available, false)
   assert.ok(FIELD_KEYS.includes('uiBackend'))
-  assert.ok(['auto', 'idb', 'xcodebuildmcp', 'none'].includes(value.setting), `unexpected setting: ${value.setting}`)
 })
 
 /**
@@ -442,6 +610,10 @@ test('settings namespace fields reach the tool layer through the live config', a
  * default in-order, non-concurrent execution.
  */
 test('the suite changes no simulator state and reaches no unstubbed command', () => {
+  // A positive control: the negative assertions below only mean something when
+  // the seam actually answered the probes this suite made.
+  assert.ok(seam.commands.length > 0, 'the offline seam must have answered at least one command')
+  assert.ok(seam.commands.includes('xcode-select -p'), 'the diagnostic probe must go through the seam')
   assert.deepEqual(seam.mutating, [], 'a unit test tried to change simulator state')
   assert.deepEqual(seam.unknown, [], 'an unstubbed command was reached; add it to test/helpers/offline-seam.mjs or stop reaching the machine')
 })

@@ -192,7 +192,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | 宿主检查 | 仅 `ios_preflight` 里检查一次 `process.platform` | 中央化的 `requireMacOS()`：每个需要 Apple 工具链的入口都会先拒绝；配置页面同步 + 权威双重判定 |
 | 工作目录 | `process.cwd()` | `exec.agent.session.header.cwd`（会话工作区） |
 | 数据目录 | `IOS_SIM_PLUGIN_DATA` / 临时目录 | `$DSH_HOME/ios-simulator-helper`，可在配置页面配置 |
-| 路径安全 | `inside(cwd, path)` 拒绝逃逸 | 同一语义；另区分「只读路径」（`ios_install_app` 允许绝对路径）与「写入目标」（必须在会话工作区内） |
+| 路径安全 | `inside(cwd, path)` 拒绝逃逸 | 同一语义；另区分「只读路径」（`ios_install_app` 允许绝对路径）与「写入目标」（会话工作区或插件自身的输出根目录，因此工具回报为绝对路径的值可以直接传回） |
 | 截图返回 | MCP image content（base64） | host 附件引用生成的图像块，失败时退化为文本 + 磁盘路径 |
 | 结果归一 | providers 直接返回含 `undefined` 的对象 | 所有工具结果经 `toLosslessJson()` 归一（注册表拒绝 `undefined`） |
 | 斜杠命令 | 注入一段提示词给模型 | 直接运行诊断并输出结论 |

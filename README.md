@@ -192,7 +192,7 @@ Two behaviours deserve their own note:
 | Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()` in front of every Apple-tooling call, plus the configuration page's synchronous and authoritative verdicts |
 | Working directory | `process.cwd()` | `exec.agent.session.header.cwd` (the session workspace) |
 | Data directory | `IOS_SIM_PLUGIN_DATA` / temp | `$DSH_HOME/ios-simulator-helper`, configurable on the configuration page |
-| Path safety | `inside(cwd, path)` refuses escapes | Same semantics, split into read-only paths (an absolute `.app` is fine) and write targets (must stay inside the session workspace) |
+| Path safety | `inside(cwd, path)` refuses escapes | Same semantics, split into read-only paths (an absolute `.app` is fine) and write targets (the session workspace or the plugin's own output roots, so a path the tool reported absolute can be passed straight back) |
 | Screenshot result | MCP image content (base64) | An image block built from a host attachment reference, degraded to text plus a disk path on refusal |
 | Result normalisation | Providers return objects containing `undefined` | Every tool result passes through `toLosslessJson()` (the registry rejects `undefined`) |
 | Slash command | Injects a prompt into the model's conversation | Runs the diagnostic and prints the verdict |

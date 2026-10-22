@@ -56,8 +56,20 @@ const ORIGINAL_TOOLS = [
 /** The one tool this plugin adds to the original set. */
 const ADDED_TOOLS = ['ios_shutdown_simulator']
 
-/** A Cordis context stand-in that records everything the plugin registers. */
-function fakeContext(services = ['tools', 'skills', 'commands', 'connection', 'settings'], overrides = {}) {
+/**
+ * A Cordis context stand-in that records everything the plugin registers.
+ *
+ * `extraStores` are looked up the same way as the built-in services, which is
+ * how a case supplies the optional services a tool reaches for by name — the
+ * attachment store and the model registry behind `ios_screenshot`'s image
+ * admission.
+ *
+ * @param {string[]} [services] - the services this composition provides.
+ * @param {Record<string, unknown>} [overrides] - properties copied onto the context.
+ * @param {Record<string, unknown>} [extraStores] - further named services.
+ * @returns {{ctx: object, registered: object, services: string[]}} the stand-in.
+ */
+function fakeContext(services = ['tools', 'skills', 'commands', 'connection', 'settings'], overrides = {}, extraStores = {}) {
   const registered = { tools: [], disposers: [], skills: [], commands: [], routes: [], settingsPolicy: [] }
   const stores = {
     tools: {
@@ -83,7 +95,7 @@ function fakeContext(services = ['tools', 'skills', 'commands', 'connection', 's
   const ctx = {
     logger: { info() {}, warn() {}, error() {} },
     fiber: { id: 'test-fiber' },
-    get: (name) => stores[name],
+    get: (name) => extraStores[name] ?? stores[name],
     // `inject` resolves only the services this composition provides: that is
     // what makes a deployment missing one of them still mount the rest.
     inject: (names, callback) => {
@@ -100,10 +112,17 @@ function fakeContext(services = ['tools', 'skills', 'commands', 'connection', 's
   return { ctx, registered, services }
 }
 
-/** Mount the plugin on a fresh stand-in. */
-function mount(services) {
-  const fake = fakeContext(services)
-  plugin.apply(fake.ctx, {})
+/**
+ * Mount the plugin on a fresh stand-in.
+ *
+ * @param {string[]} [services] - the services this composition provides.
+ * @param {Record<string, unknown>} [extraStores] - further named services.
+ * @param {Record<string, unknown>} [config] - the plugin config to mount with.
+ * @returns {{ctx: object, registered: object, services: string[]}} the stand-in.
+ */
+function mount(services, extraStores, config = {}) {
+  const fake = fakeContext(services, {}, extraStores)
+  plugin.apply(fake.ctx, config)
   return fake
 }
 
@@ -265,9 +284,22 @@ test('a project in a subdirectory is found with its schemes', async () => {
       logger: { info() {}, warn() {}, error() {} },
     })
     await create(rt, { name: 'Demo', dir: 'Sub' })
-    const found = await discover(rt, path.join(root, 'Sub'))
+    const searched = path.join(root, 'Sub')
+    const before = seam.calls.length
+    const found = await discover(rt, searched)
     assert.deepEqual(found.projects, ['Demo.xcodeproj'])
     assert.deepEqual(found.schemes, ['Demo'], 'the schemes must be resolved against the searched directory')
+    // The name alone proves nothing: the offline seam answers a listing from
+    // whatever path it was given, so a listing that asked for the wrong file —
+    // or ran in the wrong directory — would still produce "Demo". The argv and
+    // the cwd are what the fix actually changed.
+    const listings = seam.calls.slice(before).filter((call) => call.line.startsWith('xcodebuild -list -json '))
+    assert.equal(listings.length, 1, 'discovery lists the schemes once')
+    assert.ok(
+      listings[0].argv.includes(path.join(searched, 'Demo.xcodeproj')),
+      `the scheme listing must name the absolute bundle path, saw: ${listings[0].line}`,
+    )
+    assert.equal(listings[0].cwd, searched, 'the scheme listing must run in the directory that was searched')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -376,9 +408,20 @@ test('an explicit project asks for its own schemes instead of guessing from the 
       workspaces: [],
       schemes: ['First'],
     }
+    const before = seam.calls.length
     const src = await source(rt, { project: 'Second.xcodeproj' }, found)
     assert.equal(src.file, 'Second.xcodeproj')
     assert.equal(src.scheme, 'Second', 'the second project has its own xcodebuild -list answer')
+    // Guessing the basename produces "Second" as well, so the scheme name
+    // alone cannot tell "asked xcodebuild" from "guessed". The listing is the
+    // observation that separates them.
+    const listings = seam.calls.slice(before).filter((call) => call.line.startsWith('xcodebuild -list -json '))
+    assert.equal(listings.length, 1, 'an explicitly named project must be listed, not guessed')
+    assert.ok(
+      listings[0].argv.includes(path.join(root, 'Second.xcodeproj')),
+      `the listing must name the requested project, saw: ${listings[0].line}`,
+    )
+    assert.equal(listings[0].cwd, root)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -600,6 +643,205 @@ test('settings fields reach the tool layer through the live config', async () =>
   assert.equal(value.backend, 'none')
   assert.equal(value.available, false)
   assert.ok(FIELD_KEYS.includes('uiBackend'))
+})
+
+/**
+ * A mounted plugin, a temp workspace and a data root outside that workspace.
+ *
+ * The cases that go through a tool body need the same three things: a
+ * workspace the exec record names, a data root the runtime computes captures
+ * and logs under, and the registered tools. The data root is a second temp
+ * directory on purpose — a capture written inside the workspace would be
+ * reported as a relative path, and the point of those cases is the absolute
+ * form the plugin hands back.
+ *
+ * @param {string} label - the mkdtemp prefix.
+ * @param {{config?: Record<string, unknown>, services?: string[],
+ *   stores?: Record<string, unknown>}} [options] - plugin config, provided services and extra named services.
+ * @returns {Promise<{root: string, dataRoot: string, registered: object, exec: object,
+ *   tool: (name: string) => any, cleanup: () => Promise<void>}>} the fixture.
+ */
+async function toolFixture(label, options = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), label))
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), `${label}data-`))
+  const fake = mount(options.services, options.stores, { dataDir: dataRoot, ...(options.config ?? {}) })
+  return {
+    root,
+    dataRoot,
+    registered: fake.registered,
+    exec: { agent: { session: { header: { cwd: root } } }, signal: undefined },
+    /** The one registered tool of that name. */
+    tool: (name) => {
+      const found = fake.registered.tools.find((tool) => tool.name === name)
+      assert.ok(found !== undefined, `tool ${name} is not registered`)
+      return found
+    },
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true })
+      await rm(dataRoot, { recursive: true, force: true })
+    },
+  }
+}
+
+/** Skip a case that drives an Apple tool on a host that cannot run it. */
+const MAC_ONLY = process.platform === 'darwin' ? false : 'macOS only'
+
+test('a reported absolute path is accepted when it is fed back as an argument', { skip: MAC_ONLY }, async () => {
+  // The plugin reports a capture outside the session workspace with its
+  // absolute path, because a `../../..` path would be a workspace-relative lie.
+  // That reported value is then the obvious thing to pass back — the path of
+  // the last capture, a DerivedData directory the build created — so the
+  // argument contract has to accept it instead of refusing the plugin's own
+  // answer.
+  seam.restore()
+  seam.allowMutations = true
+  const fixture = await toolFixture('dsh-path-feedback-')
+  try {
+    const shot = fixture.tool('ios_screenshot')
+    const first = await shot.execute({}, fixture.exec)
+    assert.equal(first.path, first.absolutePath, 'a capture outside the workspace is reported absolutely')
+    assert.ok(
+      first.absolutePath.startsWith(fixture.dataRoot),
+      `the capture must land under the data root: ${first.absolutePath}`,
+    )
+    const again = await shot.execute({ path: first.absolutePath }, fixture.exec)
+    assert.equal(again.absolutePath, first.absolutePath, 'the reported path must be an accepted argument')
+    // The wider roots are still bounded: an absolute path outside the workspace
+    // and outside the plugin's own roots stays refused.
+    await assert.rejects(
+      () => shot.execute({ path: path.join(os.tmpdir(), 'not-ours.png') }, fixture.exec),
+      /escapes the session workspace/,
+    )
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
+})
+
+test('a reported DerivedData path is accepted when it is fed back as an argument', { skip: MAC_ONLY }, async () => {
+  seam.restore()
+  const fixture = await toolFixture('dsh-derived-feedback-')
+  try {
+    await fixture.tool('ios_create_app').execute({ name: 'Demo' }, fixture.exec)
+    const derived = path.join(fixture.dataRoot, 'DerivedData', 'pinned')
+    const built = await fixture.tool('ios_build_app').execute({ derivedDataPath: derived }, fixture.exec)
+    assert.equal(built.ok, true)
+    assert.equal(built.derivedDataPath, derived, 'the reported DerivedData directory must be an accepted argument')
+    await assert.rejects(
+      () => fixture.tool('ios_build_app').execute({ derivedDataPath: path.join(os.tmpdir(), 'other-dd') }, fixture.exec),
+      /escapes the session workspace/,
+    )
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
+})
+
+test('a failed simulator query is reported, not flattened to an empty list', { skip: MAC_ONLY }, async () => {
+  // "simctl could not answer" and "this machine has no simulator" are different
+  // facts: the first must not send the user to install a runtime they already
+  // have. Each half reports its own failure so one probe cannot hide the other.
+  seam.restore()
+  seam.devices = { code: 1, stderr: 'simctl: could not reach CoreSimulatorService\n' }
+  seam.runtimes = { code: 1, stderr: 'simctl: no runtimes could be read\n' }
+  const fixture = await toolFixture('dsh-list-error-')
+  try {
+    const value = await fixture.tool('ios_list_simulators').execute({}, fixture.exec)
+    assert.deepEqual(value.simulators, [])
+    assert.deepEqual(value.runtimes, [])
+    assert.match(value.simulatorsError, /CoreSimulatorService/)
+    assert.match(value.runtimesError, /no runtimes could be read/)
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
+})
+
+test('a capture without an attachment service still returns the PNG it wrote', { skip: MAC_ONLY }, async () => {
+  // A deployment may serve no attachments service at all; the capture is still
+  // useful because the file exists and its path is in the result, so the
+  // refusal degrades to text instead of failing the call.
+  seam.restore()
+  seam.allowMutations = true
+  const fixture = await toolFixture('dsh-image-none-')
+  try {
+    const value = await fixture.tool('ios_screenshot').execute({}, fixture.exec)
+    assert.equal(value.attachment, undefined)
+    assert.match(value.imageUnavailable, /stores no attachments/)
+    assert.equal(value.mediaType, 'image/png')
+    assert.ok(value.bytes > 0)
+    assert.equal(typeof value.absolutePath, 'string')
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
+})
+
+test('a model that does not accept images gets a text result, not an attachment', { skip: MAC_ONLY }, async () => {
+  seam.restore()
+  seam.allowMutations = true
+  const saved = []
+  const fixture = await toolFixture('dsh-image-model-', {
+    stores: {
+      attachments: { saveImages: async (items) => (saved.push(items), [{ id: 'att-1' }]) },
+      llm: { resolveModelInfo: async () => ({ inputModalities: ['text'] }) },
+    },
+  })
+  try {
+    const exec = {
+      ...fixture.exec,
+      agent: {
+        ...fixture.exec.agent,
+        options: { model: 'text-only', provider: 'example' },
+      },
+    }
+    const value = await fixture.tool('ios_screenshot').execute({}, exec)
+    assert.equal(value.attachment, undefined)
+    assert.match(value.imageUnavailable, /does not declare image input/)
+    assert.deepEqual(saved, [], 'an image the model cannot read must not be stored')
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
+})
+
+test('an attachment store that refuses the image does not fail the capture', { skip: MAC_ONLY }, async () => {
+  seam.restore()
+  seam.allowMutations = true
+  const fixture = await toolFixture('dsh-image-refused-', {
+    stores: {
+      attachments: {
+        saveImages: async () => {
+          throw new Error('the store is full')
+        },
+      },
+    },
+  })
+  try {
+    const value = await fixture.tool('ios_screenshot').execute({}, fixture.exec)
+    assert.equal(value.attachment, undefined)
+    assert.match(value.imageUnavailable, /refused the screenshot: the store is full/)
+    assert.ok(value.bytes > 0)
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
+})
+
+test('an attachment store that returns no reference is reported, not silently dropped', { skip: MAC_ONLY }, async () => {
+  seam.restore()
+  seam.allowMutations = true
+  const fixture = await toolFixture('dsh-image-empty-', {
+    stores: { attachments: { saveImages: async () => [] } },
+  })
+  try {
+    const value = await fixture.tool('ios_screenshot').execute({}, fixture.exec)
+    assert.equal(value.attachment, undefined)
+    assert.match(value.imageUnavailable, /returned no reference/)
+  } finally {
+    seam.restore()
+    await fixture.cleanup()
+  }
 })
 
 /**

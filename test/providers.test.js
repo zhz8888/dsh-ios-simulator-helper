@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { readSettings } from '../lib/settings.js'
-import { defaultDataRoot, inside, readablePath, rel } from '../lib/util/path.js'
-import { splitArgumentLines } from '../lib/util/run.js'
+import { defaultDataRoot, displayPath, inside, readablePath, rel } from '../lib/util/path.js'
+import { run, splitArgumentLines } from '../lib/util/run.js'
 import { toLosslessJson, truncate } from '../lib/util/content.js'
 import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/providers/host.js'
 import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
@@ -338,6 +339,30 @@ test('a read-only path may be absolute, but never implied by a relative escape',
   assert.equal(readablePath(base, 'build/App.app'), '/Users/me/project/build/App.app')
   assert.throws(() => readablePath(base, '../App.app'), /escapes the session workspace/)
   assert.throws(() => readablePath(base, ''), /A path is required/)
+})
+
+test('the workspace guard resolves a symlink that leaves the workspace', async () => {
+  // A path that only reads as inside the workspace is not inside it: the
+  // symlink is followed when the file is written, so the boundary has to be
+  // decided on the real path.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-workspace-guard-'))
+  try {
+    const workspace = path.join(root, 'workspace')
+    const outside = path.join(root, 'outside')
+    await mkdir(workspace, { recursive: true })
+    await mkdir(outside, { recursive: true })
+    await symlink(outside, path.join(workspace, 'link'))
+    assert.equal(inside(workspace, 'shot.png'), path.join(workspace, 'shot.png'))
+    assert.throws(() => inside(workspace, 'link/escaped.png'), /escapes the session workspace/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a reported path is relative inside the workspace and absolute outside it', () => {
+  const cwd = '/Users/me/project'
+  assert.equal(displayPath(cwd, path.join(cwd, 'shot.png')), 'shot.png')
+  assert.equal(displayPath(cwd, '/Users/me/elsewhere/shot.png'), '/Users/me/elsewhere/shot.png')
 })
 
 test('the data root falls back from DSH_HOME to the user home to temp', () => {

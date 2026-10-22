@@ -52,7 +52,14 @@ const device = deviceIndex === -1 ? undefined : process.argv[deviceIndex + 1]
 const dataDirIndex = process.argv.indexOf('--data-dir')
 const dataDirArg = dataDirIndex === -1 ? undefined : process.argv[dataDirIndex + 1]
 
-/** Run one named step, printing its result and continuing on failure. */
+/**
+ * Run one named step, printing its result and continuing on failure.
+ *
+ * @template T
+ * @param {string} name - the step label.
+ * @param {() => Promise<T>} run - the step body.
+ * @returns {Promise<{ok: true, value: T} | {ok: false, error: unknown}>} the outcome.
+ */
 async function step(name, run) {
   process.stdout.write(`\n=== ${name} ===\n`)
   try {
@@ -95,9 +102,13 @@ console.log(`host platform:     ${runtime.platform}`)
 
 const results = {}
 const preflightResult = await step('ios_preflight', () => preflight(runtime))
-results.preflight = preflightResult.ok
+// `preflight` reports a missing Xcode as `{ok: false}` rather than throwing, so
+// the step's own success only says the function returned. The verdict is the
+// report's `ok`, and that is what the summary must print.
+const preflightReady = preflightResult.ok && preflightResult.value.ok === true
+results.preflight = preflightReady
 
-if (!preflightResult.ok || runtime.platform !== 'darwin') {
+if (!preflightReady || runtime.platform !== 'darwin') {
   console.log('\nHost is not ready; staying with the read-only probes that still mean something.')
 } else {
   results.simulators = (await step('ios_list_simulators', async () => ({
@@ -185,7 +196,7 @@ if (withSimulator) {
 
 const failed = Object.entries(results).filter(([, ok]) => ok !== true).map(([name]) => name)
 console.log(`\nsteps: ${Object.keys(results).length}, failed: ${failed.length === 0 ? 'none' : failed.join(', ')}`)
-if (!preflightResult.ok) {
+if (!preflightReady) {
   console.log('preflight verdict: not ready (see the failing checks above)')
 } else {
   console.log(`preflight verdict: ready${withSimulator ? '' : ' (read-only run; pass --with-simulator for the full loop)'}`)

@@ -48,6 +48,8 @@ test('client bundle is a classic script, not an ES module', () => {
   const source = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
   assert.ok(!/^\s*import\s/m.test(source), 'bundle must not use import statements')
   assert.ok(!/^\s*export\s/m.test(source), 'bundle must not use export statements')
+  assert.ok(!/\bimport\s*\(/.test(source), 'bundle must not use dynamic import()')
+  assert.ok(!/\bimport\s*\.\s*meta/.test(source), 'bundle must not use import.meta')
   assert.match(source, /window\.__ModuleLoader__\.load\(\{/)
 })
 

@@ -76,6 +76,12 @@ for (const specifier of declaredExternals) {
 if (/^\s*(import|export)\s/m.test(clientSource)) {
   fail('the client bundle must be a classic script: no import/export statements')
 }
+// A classic script evaluated through `new Function` can still call the dynamic
+// `import()` form, and that would load a module outside the shell's static
+// table without any `require` the load contract sees.
+if (/\bimport\s*\(/.test(clientSource) || /\bimport\s*\.\s*meta/.test(clientSource)) {
+  fail('the client bundle must not use dynamic import() or import.meta')
+}
 if (failures.length > 0) {
   console.error(`check-bundle: ${failures.length} problem(s)\n`)
   for (const message of failures) console.error(`  - ${message}`)

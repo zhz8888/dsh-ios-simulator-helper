@@ -10,7 +10,7 @@ import { run, splitArgumentLines } from '../lib/util/run.js'
 import { toLosslessJson, truncate } from '../lib/util/content.js'
 import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/providers/host.js'
 import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
-import { clampLimit, clampSeconds } from '../lib/providers/logs.js'
+import { clampLimit, clampSeconds, logLengths, logPredicate } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
 import { macroSandboxDenied, pickAppProduct, requestedTimeoutMs } from '../lib/providers/build.js'
 import { PAGE_LOCATION, preflight } from '../lib/providers/preflight.js'
@@ -385,6 +385,28 @@ test('the build timeout argument is validated, not trusted', () => {
   assert.equal(requestedTimeoutMs(-1), undefined)
   assert.equal(requestedTimeoutMs(Number.NaN), undefined)
   assert.equal(requestedTimeoutMs(2 ** 31), undefined)
+})
+
+test('the log filter refuses an identifier with an empty segment', () => {
+  // An empty last segment would build `process CONTAINS ""`, which matches
+  // every line: the filter would answer with the whole log while reporting
+  // itself as applied.
+  assert.throws(() => logPredicate('com.example.'), /Invalid bundle id/)
+  assert.throws(() => logPredicate('com..example'), /Invalid bundle id/)
+  assert.throws(() => logPredicate('com.example"'), /Invalid bundle id/)
+  assert.equal(
+    logPredicate('com.example.demo'),
+    'subsystem CONTAINS "com.example.demo" OR process CONTAINS "demo"',
+  )
+})
+
+test('the truncation flag is read from the length before the truncation', () => {
+  // The marker is longer than the text it replaces for a small overflow, so a
+  // flag derived from the truncated text would report "not truncated" for a
+  // log that visibly ends in the marker.
+  assert.deepEqual(logLengths('x'.repeat(20_000), 20_000), { characters: 20_000, truncated: false })
+  assert.deepEqual(logLengths('x'.repeat(20_001), 20_000), { characters: 20_000, truncated: true })
+  assert.deepEqual(logLengths('x'.repeat(20_500), 20_000), { characters: 20_000, truncated: true })
 })
 
 test('a reported path is relative inside the workspace and absolute outside it', () => {

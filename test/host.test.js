@@ -195,6 +195,51 @@ test('ios_screenshot renders an image block only when one was admitted', () => {
   assert.deepEqual(withImage[1].attachment, { id: 'a' })
 })
 
+test('the build report names exactly the fields its schema declares', async () => {
+  // The result schema is the contract the model reads. A schema that names
+  // fields the provider never returns sends the model looking for values that
+  // are not there, and a provider field the schema does not name is one the
+  // model is not told about. The two are compared here, field by field.
+  const { registered } = mount()
+  const byName = new Map(registered.tools.map((tool) => [tool.name, tool]))
+  const declared = Object.keys(byName.get('ios_build_app').output.schema.properties).sort()
+  assert.deepEqual(declared, [
+    'appPath',
+    'bundleId',
+    'bundleIdSource',
+    'code',
+    'configuration',
+    'derivedDataPath',
+    'logPath',
+    'macroSandboxRetry',
+    'ok',
+    'output',
+    'simulator',
+    'source',
+    'timedOut',
+  ])
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-build-report-'))
+  try {
+    // Imported dynamically, like the plugin itself: the seam has replaced
+    // `spawn` by now, and a static import would link the real one.
+    const { create } = await import('../lib/providers/project.js')
+    const { app } = await import('../lib/providers/build.js')
+    const { createRuntime } = await import('../lib/runtime.js')
+    const rt = createRuntime({
+      config: { dataDir: root },
+      exec: { agent: { session: { header: { cwd: root } } } },
+      logger: { info() {}, warn() {}, error() {} },
+    })
+    await create(rt, { name: 'Demo' })
+    const report = await app(rt, {})
+    for (const key of Object.keys(report)) {
+      assert.ok(declared.includes(key), `the build report produced "${key}", which the schema does not declare`)
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('a project in a subdirectory is found with its schemes', async () => {
   // The report names the projects relative to the directory that was searched,
   // so the scheme lookup has to be resolved against that same directory: a

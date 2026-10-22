@@ -9,7 +9,7 @@ import { defaultDataRoot, displayPath, inside, readablePath, rel } from '../lib/
 import { run, splitArgumentLines } from '../lib/util/run.js'
 import { toLosslessJson, truncate } from '../lib/util/content.js'
 import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/providers/host.js'
-import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
+import { alreadyShutdownText, chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
 import { clampLimit, clampSeconds, logLengths, logPredicate } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
 import { macroSandboxDenied, pickAppProduct, requestedTimeoutMs } from '../lib/providers/build.js'
@@ -407,6 +407,12 @@ test('the truncation flag is read from the length before the truncation', () => 
   assert.deepEqual(logLengths('x'.repeat(20_000), 20_000), { characters: 20_000, truncated: false })
   assert.deepEqual(logLengths('x'.repeat(20_001), 20_000), { characters: 20_000, truncated: true })
   assert.deepEqual(logLengths('x'.repeat(20_500), 20_000), { characters: 20_000, truncated: true })
+})
+
+test('a refused shutdown counts as a no-op only when the device was already down', () => {
+  assert.equal(alreadyShutdownText('Unable to shutdown device in current state: Shutdown'), true)
+  assert.equal(alreadyShutdownText('Unable to shutdown device in current state: Booting'), false)
+  assert.equal(alreadyShutdownText('An error was encountered processing the command'), false)
 })
 
 test('a reported path is relative inside the workspace and absolute outside it', () => {

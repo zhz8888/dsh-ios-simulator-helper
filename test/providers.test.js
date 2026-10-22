@@ -359,6 +359,29 @@ test('the workspace guard resolves a symlink that leaves the workspace', async (
   }
 })
 
+test('the UI status refuses a non-macOS host before probing anything', async () => {
+  const runtime = { platform: 'linux', settings: readSettings({}, {}) }
+  const result = await uiStatus(runtime)
+  assert.equal(result.available, false)
+  assert.match(result.detail, /only runs on macOS/)
+})
+
+test('the workspace guard refuses a dangling symlink instead of resolving it lexically', async () => {
+  // A link whose target does not exist yet has no real path; resolving it as if
+  // it were an ordinary not-yet-created segment is how a write escapes.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-dangling-guard-'))
+  try {
+    const workspace = path.join(root, 'workspace')
+    const outside = path.join(root, 'outside')
+    await mkdir(workspace, { recursive: true })
+    await mkdir(outside, { recursive: true })
+    await symlink(path.join(outside, 'never-written.png'), path.join(workspace, 'dangling'))
+    assert.throws(() => inside(workspace, 'dangling'), /escapes the session workspace/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('a timeout the timer cannot represent does not kill the child instantly', async () => {
   // Node's timers take a 32-bit signed delay, so a larger one overflows to
   // 1 ms: the child would be killed before it started and the call would

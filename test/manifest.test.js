@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -293,4 +294,43 @@ test('the bundled skill has the frontmatter DSH needs', () => {
   assert.match(skill, /^name: ios-dev$/m)
   assert.match(skill, /^description: .+$/m)
   assert.match(skill, /macOS/)
+})
+
+test('the ignore rules keep run artefacts out without hiding a tracked image', () => {
+  // AGENTS.md says a run's screenshots, logs, DerivedData, scratch profiles,
+  // tarballs and the verification documents are never committed. A blanket
+  // `*.png` covered the captures, but it also ignored every PNG at every depth,
+  // so a future figure or marketplace frame the repository means to track would
+  // have been dropped by `git add` without a word. The rules are asserted
+  // through `git check-ignore` rather than by reading the file, because it is
+  // the resulting decision that commits depend on — `--no-index` answers for
+  // paths that do not exist, so no temporary file has to be written.
+  const cases = [
+    // What a run must never commit.
+    ['DerivedData/Build/Products/x.app', true],
+    ['screenshots/2026-10-22-target.png', true],
+    ['capture.png', true],
+    ['.tmp-smoke/out.png', true],
+    ['.dsh-scratch/settings.json', true],
+    ['build/app.tgz', true],
+    ['run.log', true],
+    ['coverage/lcov.info', true],
+    ['docs/verification/2026-10-22-release-verification-findings.md', true],
+    // What must stay addable: the curated marketplace frames, the plugin icon
+    // and any future image outside the directories a run writes to.
+    ['assets/2026-10-22-target.png', false],
+    ['ios-simulator.png', false],
+    ['lib/figures/diagram.png', false],
+    ['README.md', false],
+  ]
+  for (const [file, ignored] of cases) {
+    const result = spawnSync('git', ['check-ignore', '-q', '--no-index', '--', file], { cwd: ROOT })
+    assert.equal(result.error, undefined, 'git must be available: the ignore rules are checked through it')
+    assert.notEqual(result.status, 128, `git check-ignore failed: ${String(result.stderr)}`)
+    assert.equal(
+      result.status === 0,
+      ignored,
+      `${file} must ${ignored ? '' : 'not '}be ignored by .gitignore`,
+    )
+  }
 })

@@ -45,9 +45,14 @@ yarn-error.log*
 # against it, so the tree lands in the checkout whenever the workspace is
 # the repository.
 DerivedData/
-# A screenshot lands in the session workspace as well, so the rule covers
-# every depth rather than the package root alone.
-*.png
+# A screenshot lands in the session workspace when the screenshot directory is
+# configured to a workspace-relative one — the default writes under the plugin
+# data directory instead. These are the two directories a run can put a capture
+# in, named rather than covered by a blanket `*.png`: that rule ignored every
+# PNG at every depth, so a future image the repository means to track would
+# have been silently dropped by `git add`.
+screenshots/
+/*.png
 # ...except the curated marketplace screenshots: `assets/` holds the four
 # hand-picked frames `screenshots.json` declares to a plugin market.
 !assets/*.png

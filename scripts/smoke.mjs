@@ -116,9 +116,16 @@ if (withSimulator && runtime.platform === 'darwin') {
   results.create = created.ok
 
   if (noMacros && created.ok) {
+    // The rewrite goes through `step()` like every other write here: an
+    // unguarded rejection would abort the script before the cleanup removed
+    // the throwaway project, and before the summary said what happened.
     const view = path.join(root, 'SmokeApp', 'SmokeApp', 'ContentView.swift')
-    await writeFile(view, MACRO_FREE_VIEW, 'utf8')
-    console.log(`\n(rewrote ${path.relative(root, view)} without Swift macros)`)
+    results.macros = (
+      await step('rewrite ContentView.swift without Swift macros', async () => {
+        await writeFile(view, MACRO_FREE_VIEW, 'utf8')
+        return { rewrote: path.relative(root, view) }
+      })
+    ).ok
   }
 
   // Remember whether the session booted the device or found it already running,

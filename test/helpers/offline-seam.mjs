@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { Readable, Writable } from 'node:stream'
 import { createRequire } from 'node:module'
+import path from 'node:path'
 
 /**
  * Answer the plugin's Apple-tool probes from a table instead of the machine.
@@ -73,6 +74,35 @@ const ANSWERS = [
 ]
 
 /**
+ * Answers matched on the shape of the command line.
+ *
+ * The `xcodebuild` command lines carry the project path, the destination and
+ * the DerivedData directory the plugin computed, so they cannot be matched
+ * literally; the shape is enough to answer them. The order matters: the more
+ * specific shapes come first.
+ */
+const PATTERNS = [
+  {
+    match: (line) => line.startsWith('xcodebuild -list -json '),
+    // A listing names the scheme after the bundle it was asked about, which
+    // is what Xcode does for a single-target project.
+    answer: (line) => {
+      const file = /-(?:project|workspace) (\S+)/.exec(line)?.[1] ?? 'Unknown.xcodeproj'
+      const scheme = path.basename(file, path.extname(file))
+      return { stdout: JSON.stringify({ project: { schemes: [scheme] } }) }
+    },
+  },
+  {
+    match: (line) => line.startsWith('xcodebuild ') && line.includes(' -showBuildSettings'),
+    stdout: '    PRODUCT_BUNDLE_IDENTIFIER = com.example.demo\n',
+  },
+  {
+    match: (line) => line.startsWith('xcodebuild ') && line.endsWith(' build'),
+    stdout: '** BUILD SUCCEEDED **\n',
+  },
+]
+
+/**
  * The `simctl` verbs that only read.
  *
  * Anything else is refused. A deny-list of state-changing verbs would go stale
@@ -113,6 +143,12 @@ childProcess.spawn = function offlined(command, args = [], _options) {
 
   const answer = ANSWERS.find((item) => item.argv === line)
   if (answer) return cannedChild(answer)
+
+  const pattern = PATTERNS.find((item) => item.match(line))
+  if (pattern) {
+    const answer = typeof pattern.answer === 'function' ? pattern.answer(line) : pattern
+    return cannedChild(answer)
+  }
 
   seam.unknown.push(line)
   return cannedChild({ stderr: `offline-seam: "${line}" is not stubbed\n`, code: 127 })

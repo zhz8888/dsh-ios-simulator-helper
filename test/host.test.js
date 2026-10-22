@@ -195,6 +195,29 @@ test('ios_screenshot renders an image block only when one was admitted', () => {
   assert.deepEqual(withImage[1].attachment, { id: 'a' })
 })
 
+test('a project in a subdirectory is found with its schemes', async () => {
+  // The report names the projects relative to the directory that was searched,
+  // so the scheme lookup has to be resolved against that same directory: a
+  // listing asked for the workspace instead finds nothing, or the schemes of
+  // a different project that happens to share the name.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-discover-sub-'))
+  try {
+    const { create, discover } = await import('../lib/providers/project.js')
+    const { createRuntime } = await import('../lib/runtime.js')
+    const rt = createRuntime({
+      config: { dataDir: root },
+      exec: { agent: { session: { header: { cwd: root } } } },
+      logger: { info() {}, warn() {}, error() {} },
+    })
+    await create(rt, { name: 'Demo', dir: 'Sub' })
+    const found = await discover(rt, path.join(root, 'Sub'))
+    assert.deepEqual(found.projects, ['Demo.xcodeproj'])
+    assert.deepEqual(found.schemes, ['Demo'], 'the schemes must be resolved against the searched directory')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('the bundled skill is registered with its body and resource directory', () => {
   const { registered } = mount()
   assert.equal(registered.skills.length, 1)

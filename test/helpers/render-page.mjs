@@ -30,6 +30,7 @@ import { loadBundle, ROOT } from './load-bundle.mjs'
 const report = {
   failures: [],
   variants: {},
+  toast: null,
   registered: null,
   unserved: null,
   fieldKeys: [],
@@ -38,6 +39,26 @@ const report = {
   hostApi: {},
   dictionaryKeys: { en: [], zh: [] },
   usedKeys: [],
+}
+
+/**
+ * The last toast the page rendered, and how often it rendered one.
+ *
+ * The primitives' `Toast` double owns no timers, so nothing in this process can
+ * let its hold expire. The wrapper below records the completion callback the
+ * page handed the toast, and the driver calls that callback to model the toast
+ * finishing — the same way the real `Toast` reports completion.
+ */
+const toast = { onDone: undefined, renders: 0 }
+
+/** The primitives, with the toast recorder in front of the double's `Toast`. */
+const primitivesWithToast = {
+  ...primitives,
+  Toast: (props) => {
+    toast.onDone = props.onDone
+    toast.renders += 1
+    return primitives.Toast(props)
+  },
 }
 
 /** The values the fake host serves, matching the plugin's declared defaults. */
@@ -211,7 +232,7 @@ const { ctx, registered } = fakeContext()
 const { exported } = loadBundle({
   resolve: (specifier) => {
     if (specifier === 'react') return React
-    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return primitives
+    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return primitivesWithToast
     throw new Error(`unexpected require in the render test: ${specifier}`)
   },
 })
@@ -335,6 +356,25 @@ if (registered.component === undefined) {
       props.resetField('bootTimeoutSeconds')
       report.variants.macosReset = renderToStaticMarkup(React.createElement(component, props))
       props.discard()
+      // The browser half refuses a draft the host's declared range rejects,
+      // although the schema itself would accept the number: staging 7200 seconds
+      // in the 3600-second log window and a zero timeout must leave both drafts
+      // invalid and the save blocked.
+      props.edit('logSeconds', '7200')
+      props.edit('bootTimeoutSeconds', '0')
+      report.variants.macosOutOfRange = renderToStaticMarkup(React.createElement(component, props))
+      // An in-range number must still be accepted, so the refusal above is what
+      // the range buys and not a blanket refusal of every number draft.
+      props.discard()
+      props.edit('logSeconds', '1800')
+      report.variants.macosRangeValid = renderToStaticMarkup(React.createElement(component, props))
+      // A clear on a field the user layer does not override is still a pending
+      // change: the model plans the unset, the field is visibly empty, and the
+      // bar has to offer the save and the discard.
+      props.discard()
+      props.edit('defaultDevice', '')
+      report.variants.macosCleared = renderToStaticMarkup(React.createElement(component, props))
+      props.discard()
       // A write in flight: the model stays in its saving state until the write
       // settles, and the bar's own status line is the message the dictionary
       // carries.
@@ -343,6 +383,56 @@ if (registered.component === undefined) {
       report.variants.macosSaving = renderToStaticMarkup(React.createElement(component, props))
     } catch (error) {
       report.failures.push(`staged render threw: ${error.stack ?? error.message}`)
+    }
+
+    // ── the saved toast's lifecycle ─────────────────────────────────────────
+    // The page announces a landed write through the toast, and the confirmation
+    // belongs to the visit that saw the write: a page that mounts later must not
+    // replay it. A server render never runs an effect, so the mount notification
+    // the browser's effect sends is sent here through the same injected face, and
+    // the toast's completion is reported by calling the callback the page handed
+    // the shared `Toast`.
+    try {
+      const settle = () => new Promise((resolve) => setImmediate(resolve))
+      // Let the write left in flight above settle; it landed with no page on
+      // screen, so it must not have announced anything.
+      await settle()
+      props.discard()
+      const leave = props.pageMounted()
+      props.edit('bootTimeoutSeconds', '90')
+      props.save()
+      await settle()
+      toast.renders = 0
+      const present = renderToStaticMarkup(React.createElement(component, props))
+      report.toast = {
+        onDone: typeof toast.onDone === 'function',
+        present,
+        landingRenders: toast.renders,
+      }
+      // The shared toast reports completion through this callback: the page must
+      // drop the confirmation and never replay it without a new write.
+      if (typeof toast.onDone === 'function') toast.onDone()
+      report.toast.acked = renderToStaticMarkup(React.createElement(component, props))
+      report.toast.repeated = renderToStaticMarkup(React.createElement(component, props))
+      report.toast.renders = toast.renders
+      // A later write restarts the confirmation, keyed by its own sequence: the
+      // acknowledgement above must not swallow the next landing.
+      props.edit('bootTimeoutSeconds', '80')
+      props.save()
+      await settle()
+      report.toast.relapsed = renderToStaticMarkup(React.createElement(component, props))
+      if (typeof toast.onDone === 'function') toast.onDone()
+      // A write that lands while the page is not on screen is counted but never
+      // announced, and a page that mounts again does not replay it.
+      leave()
+      props.edit('bootTimeoutSeconds', '75')
+      props.save()
+      await settle()
+      report.toast.offscreen = renderToStaticMarkup(React.createElement(component, props))
+      props.pageMounted()
+      report.toast.remount = renderToStaticMarkup(React.createElement(component, props))
+    } catch (error) {
+      report.failures.push(`toast lifecycle threw: ${error.stack ?? error.message}`)
     }
   }
 }

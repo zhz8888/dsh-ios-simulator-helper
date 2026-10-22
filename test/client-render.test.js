@@ -59,13 +59,16 @@ test('the form registers into the plugin detail page, not the Settings page', ()
 test('the injected face carries the form actions and the view the page asks for', () => {
   // The page asks for `view: 'page'`; there is no summary view for a bundle's
   // own configuration, and the form needs no `label` of its own because the
-  // page draws the title.
+  // page draws the title. The lifecycle pair is the page's alone: it marks the
+  // visit whose writes may be confirmed, and acknowledges that confirmation.
   assert.deepEqual(report.injectKeys, [
+    'acknowledgeSaved',
     'discard',
     'edit',
     'loadHost',
     'loadInventory',
     'loadStatus',
+    'pageMounted',
     'resetField',
     'save',
     't',
@@ -249,10 +252,88 @@ test('a pending reset keeps the form dirty and the action bar present', () => {
   assert.ok(save !== undefined && !save.includes('disabled'), 'a pending reset must be saveable')
 })
 
+test('a draft outside the declared range is invalid and blocks the save', () => {
+  // The schema stores a natural number and the host refuses a zero, but it
+  // declares no maximum on purpose: a value written by an older build must not
+  // stop the plugin from mounting. The browser half is what refuses to *stage*
+  // an out-of-range draft — 7200 s in the 3600-second log window and a zero
+  // timeout must both stay inline errors, and neither may start a save.
+  const markup = report.variants.macosOutOfRange
+  assert.match(markup, /class="ismh_actions ismh_actionsError"/)
+  assert.match(markup, /One value is invalid; fix it before saving/)
+  assert.equal((markup.match(/aria-invalid="true"/g) ?? []).length, 2, 'both out-of-range drafts are flagged')
+  assert.equal(
+    (markup.match(/Enter a whole number, or leave blank to use the default\./g) ?? []).length,
+    2,
+    'each invalid field resolves the inline message instead of the hint',
+  )
+  const save = /<button[^>]*data-variant="primary"[^>]*>/.exec(markup)?.[0]
+  assert.ok(save?.includes('disabled'), 'the blocked draft must not be saveable')
+})
+
+test('a number inside the declared range is accepted, so the range is what is enforced', () => {
+  // The pair proves the refusal above is the range and not a blanket refusal of
+  // every number draft: the same field, a value inside its range, is staged and
+  // offered for save.
+  const markup = report.variants.macosRangeValid
+  assert.match(markup, /class="ismh_actions"/)
+  assert.match(markup, /Unsaved changes/)
+  assert.ok(!/aria-invalid="true"/.test(markup), 'an in-range draft must not be flagged invalid')
+  const save = /<button[^>]*data-variant="primary"[^>]*>/.exec(markup)?.[0]
+  assert.ok(save !== undefined && !save.includes('disabled'), 'an in-range draft may be saved')
+})
+
+test('a clear on a field the user layer does not override is still a pending change', () => {
+  // The clear stages an empty draft on a field the profile does not override,
+  // and the model plans the unset. The bar has to report it: otherwise the
+  // change would look saved and could be neither applied nor discarded.
+  const markup = report.variants.macosCleared
+  assert.match(markup, /class="ismh_actions"/, 'the clear keeps the action bar')
+  assert.match(markup, /Unsaved changes/)
+  assert.match(markup, /data-variant="ghost"[^>]*>Discard changes</)
+  const save = /<button[^>]*data-variant="primary"[^>]*>/.exec(markup)?.[0]
+  assert.ok(save !== undefined && !save.includes('disabled'), 'the clear must be saveable')
+})
+
 test('a write in flight shows the message the dictionary carries', () => {
   const markup = report.variants.macosSaving
   assert.match(markup, /Saving…/, 'the bar names the write that is running')
   assert.ok(!/>writing</.test(markup), 'the saving state must not render an unresolved key')
+})
+
+test('a write that lands shows the saved confirmation exactly once', () => {
+  // The page drives a real write through the shared form; the landing is then
+  // announced by the toast the page renders, keyed by the landed-write
+  // sequence. The toast receives the completion callback the shared `Toast`
+  // reports through, which is what the next test uses.
+  assert.equal(report.toast.onDone, true, 'the toast must hand the page its completion callback')
+  assert.match(report.toast.present, /data-toast="success"/)
+  assert.match(report.toast.present, /Saved to this profile/)
+  assert.equal(report.toast.landingRenders, 1, 'the landing rendered the toast exactly once')
+})
+
+test('the saved confirmation is not replayed after the toast reports completion', () => {
+  // Completion clears the sequence: a re-render after it must show no toast, and
+  // a later render without a new write must not bring it back.
+  assert.ok(!report.toast.acked.includes('data-toast'), 'acknowledging must remove the toast')
+  assert.ok(!report.toast.repeated.includes('data-toast'), 'a later render must not replay it')
+  assert.equal(report.toast.renders, 1, 'no replay means the toast rendered exactly once')
+})
+
+test('a later write restarts the confirmation instead of being swallowed', () => {
+  // The toast is keyed by the landed-write sequence, so a save after the
+  // acknowledgement must confirm itself rather than stay hidden by the last
+  // acknowledgement.
+  assert.match(report.toast.relapsed, /data-toast="success"/)
+  assert.match(report.toast.relapsed, /Saved to this profile/)
+})
+
+test('a landing that arrives while the page is off screen is never announced later', () => {
+  // The confirmation belongs to the visit that saw the write. A write that
+  // settles after the page unmounted is counted, but the next visit must not be
+  // shown a confirmation for it.
+  assert.ok(!report.toast.offscreen.includes('data-toast'), 'no toast without the page on screen')
+  assert.ok(!report.toast.remount.includes('data-toast'), 'a new visit must not replay it')
 })
 
 test('the bar state machine covers clean, pending, blocked and failed', () => {

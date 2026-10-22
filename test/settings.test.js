@@ -4,6 +4,7 @@ import {
   Config,
   FIELD_GROUPS,
   FIELD_KEYS,
+  FIELDS,
   UI_BACKENDS,
   defaultDeviceFragment,
   readSettings,
@@ -43,6 +44,30 @@ test('every declared field is a volatile node in the Config schema', () => {
   assert.deepEqual(Object.keys(root.dict), FIELD_KEYS)
   for (const ref of Object.values(root.dict)) {
     assert.equal(json.refs[ref].meta.volatile, true, 'every field must be volatile to be live-editable')
+  }
+})
+
+test('the host schema describes every field with its English hint', () => {
+  // The configuration page carries both languages itself, so the host schema's
+  // only free-text metadata is what a model reads. It must be English: the
+  // repository's code language is English, and the Chinese copy belongs to the
+  // page's own `zh` dictionary, not to the schema's description.
+  const json = Config.toJSON()
+  const root = json.refs[json.uid]
+  const descriptions = new Map()
+  for (const field of FIELDS.values()) {
+    const description = json.refs[root.dict[field.key]]?.meta?.description
+    assert.equal(description, field.hint.en, `${field.key} must describe itself with its English hint`)
+    descriptions.set(field.key, description)
+  }
+  assert.equal(descriptions.size, FIELD_KEYS.length, 'every field must be described')
+  // No description may carry a CJK character: the equality above is what
+  // catches a wrong hint, and this is the language rule stated on its own.
+  for (const [key, description] of descriptions) {
+    assert.ok(
+      !/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(description),
+      `${key} must not carry a CJK description`,
+    )
   }
 })
 
@@ -174,6 +199,23 @@ test('the log limits are clamped by the projection, without rejecting an old pro
   assert.equal(settings.logSeconds, 3600, 'a stored over-limit value is clamped, not used as-is')
   assert.equal(settings.logLimit, 1000, 'the renderer keeps 24k characters, so the limit has a floor')
   assert.equal(readSettings({}, { IOS_SIM_LOG_SECONDS: '999999' }).logSeconds, 3600)
+})
+
+test('an out-of-range stored value projects clamped and is never rejected at mount', () => {
+  // The trade this pins: a profile written by an older build (or by hand) may
+  // hold a value the field's declared range no longer admits. The schema
+  // declares no upper bound, so mounting and defaulting accept it and the
+  // stored value is kept; the per-call projection clamps it. The browser half
+  // refuses to stage a new out-of-range value, so only a value that was
+  // already stored can make the page's draft and the provider's value differ.
+  assert.doesNotThrow(() => Config())
+  assert.doesNotThrow(() => Config({ logSeconds: 5000 }))
+  assert.doesNotThrow(() => Config({ logLimit: 50000 }))
+  assert.equal(Config({ logSeconds: 5000 }).logSeconds.get(), 5000, 'the schema must not clamp what the profile stores')
+  assert.equal(Config({ logLimit: 50000 }).logLimit.get(), 50000, 'the schema must not clamp what the profile stores')
+  const settings = readSettings(liveConfig({ logSeconds: 5000, logLimit: 50000 }), {})
+  assert.equal(settings.logSeconds, 3600, 'the projection clamps the stored value')
+  assert.equal(settings.logLimit, 20000, 'the projection clamps the stored value')
 })
 
 test('the number fields refuse a zero, which is no usable timeout or limit', () => {

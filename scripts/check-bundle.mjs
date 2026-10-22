@@ -176,6 +176,16 @@ for (const field of clientFields) {
         + ` != client placeholder ${JSON.stringify(field.placeholder ?? null)}`,
     )
   }
+  // The browser half refuses to stage a number outside the range the host
+  // declares, so the two ranges are part of the duplicated table too.
+  for (const bound of ['min', 'max']) {
+    if ((host[bound] ?? undefined) !== (field[bound] ?? undefined)) {
+      fail(
+        `field "${field.key}": host ${bound} ${JSON.stringify(host[bound] ?? null)}`
+          + ` != client ${bound} ${JSON.stringify(field[bound] ?? null)}`,
+      )
+    }
+  }
 }
 
 // --- group table agreement --------------------------------------------------

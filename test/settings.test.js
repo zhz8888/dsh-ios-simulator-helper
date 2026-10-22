@@ -146,6 +146,13 @@ test('an out-of-range select value falls back to the declared default', () => {
   assert.deepEqual(UI_BACKENDS, ['auto', 'idb', 'xcodebuildmcp', 'none'])
 })
 
+test('an invalid select still falls through to a valid environment value', () => {
+  // number and boolean fields already continue down the fallback chain; a
+  // select that stopped at an invalid stored value used to shadow the env var.
+  const settings = readSettings(liveConfig({ uiBackend: 'appium' }), { IOS_SIM_UI_BACKEND: 'none' })
+  assert.equal(settings.uiBackend, 'none')
+})
+
 test('a malformed number falls back instead of reaching the providers', () => {
   const settings = readSettings(
     liveConfig({ bootTimeoutSeconds: 'soon', buildTimeoutSeconds: -5, logSeconds: 12.5, logLimit: 0 }),
@@ -155,6 +162,18 @@ test('a malformed number falls back instead of reaching the providers', () => {
   assert.equal(settings.buildTimeoutSeconds, 600)
   assert.equal(settings.logSeconds, 120)
   assert.equal(settings.logLimit, 20000)
+})
+
+test('the log limits are clamped by the projection, without rejecting an old profile', () => {
+  // The schema stays permissive on purpose: an out-of-range value written by
+  // an older build must not make the plugin fail to mount. The browser half
+  // refuses to stage a new one, and the projection clamps the stored one.
+  assert.doesNotThrow(() => Config({ logSeconds: 7200 }))
+  assert.doesNotThrow(() => Config({ logLimit: 500 }))
+  const settings = readSettings(liveConfig({ logSeconds: 7200, logLimit: 500 }), {})
+  assert.equal(settings.logSeconds, 3600, 'a stored over-limit value is clamped, not used as-is')
+  assert.equal(settings.logLimit, 1000, 'the renderer keeps 24k characters, so the limit has a floor')
+  assert.equal(readSettings({}, { IOS_SIM_LOG_SECONDS: '999999' }).logSeconds, 3600)
 })
 
 test('the number fields refuse a zero, which is no usable timeout or limit', () => {

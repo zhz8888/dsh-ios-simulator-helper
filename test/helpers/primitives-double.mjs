@@ -53,6 +53,13 @@ export function settingsTextField(field) {
  * Mirrors the shipped model: staged drafts win over the served value, a field's
  * `overridden` flag reports whether the user layer carries the key (presence,
  * not value), and `plan()` refuses a draft its spec cannot parse.
+ *
+ * The staging rules are the shipped ones, read from
+ * `dsh-client-ui-primitives/lib/index.js`: a draft whose text already equals the
+ * value in effect is not a write, a staged clear writes an `unset` only when the
+ * user layer carries the key, and every plan entry names the field it belongs
+ * to. A double that planned more than the shipped model would let a page pass
+ * here and misbehave there, so the two agree on what a save writes.
  */
 export class SettingsFormModel {
   constructor(scope, specs, secrets = []) {
@@ -121,8 +128,7 @@ export class SettingsFormModel {
   field(field) {
     const staged = this.staged.get(field)
     if (this.secretSpecs.has(field)) return { text: staged?.text ?? '', overridden: false, invalid: false }
-    const spec = this.specs.get(field)
-    if (spec === undefined) throw new Error(`unknown settings field in the page: ${field}`)
+    const spec = this.spec(field)
     if (staged === undefined) {
       return {
         text: spec.format(this.sectionValue(field)),
@@ -134,9 +140,18 @@ export class SettingsFormModel {
     return { text: staged.text, overridden: write?.kind === 'set', invalid: write === undefined }
   }
 
+  /** The conversion spec of one field. */
+  spec(field) {
+    const spec = this.specs.get(field)
+    if (spec === undefined) throw new Error(`unknown settings field in the page: ${field}`)
+    return spec
+  }
+
   /** Stage one draft. */
-  stage(field, draft) {
-    this.staged.set(field, draft)
+  stage(field, edit) {
+    this.baseline ??= this.scope.getSnapshot()
+    this.staged.set(field, edit)
+    this.failed = false
     this.publish()
   }
 
@@ -145,37 +160,52 @@ export class SettingsFormModel {
     return {
       edit: (field, text) => this.stage(field, { text, clear: false }),
       resetField: (field) => {
-        const spec = this.specs.get(field)
-        this.stage(field, { text: spec.format(this.baseValue(field)), clear: true })
+        this.stage(field, { text: this.spec(field).format(this.baseValue(field)), clear: true })
       },
       save: () => void this.save(),
       discard: () => {
         if (this.staged.size === 0 && !this.failed) return
         this.staged.clear()
+        this.baseline = undefined
         this.failed = false
         this.publish()
       },
     }
   }
 
-  /** Every staged edit a save would write. */
+  /**
+   * Every staged edit a save would write.
+   *
+   * The shipped rules: a draft whose text already equals the value in effect is
+   * not a write at all, a staged clear writes an `unset` only when the user
+   * layer carries the key, and an entry whose draft is not a value its field
+   * accepts carries no write — the form is still dirty, and the save refuses
+   * rather than dropping the edit. Every entry names its field.
+   */
   plan() {
     const plan = []
-    for (const [field, draft] of this.staged) {
-      const spec = this.specs.get(field)
-      if (draft.clear) {
-        plan.push({ op: { op: 'unset', path: [field] } })
+    for (const [field, staged] of this.staged) {
+      const secret = this.secretSpecs.get(field)
+      if (secret !== undefined) {
+        const value = staged.text.trim()
+        if (value !== '') plan.push({ field, run: () => secret.write(value) })
         continue
       }
-      const write = spec.parse(draft.text)
+      const spec = this.spec(field)
+      if (staged.clear) {
+        if (this.stored(field)) plan.push({ field, op: { op: 'unset', path: [field] } })
+        continue
+      }
+      if (staged.text === spec.format(this.sectionValue(field))) continue
+      const write = spec.parse(staged.text)
       if (write === undefined) {
-        plan.push({})
+        plan.push({ field })
         continue
       }
       plan.push(
         write.kind === 'clear'
-          ? { op: { op: 'unset', path: [field] } }
-          : { op: { op: 'set', path: [field], value: write.value } },
+          ? { field, op: { op: 'unset', path: [field] } }
+          : { field, op: { op: 'set', path: [field], value: write.value } },
       )
     }
     return plan
@@ -184,13 +214,22 @@ export class SettingsFormModel {
   /** Write every staged edit through the shared config form. */
   async save() {
     const plan = this.plan()
-    if (!plan.length || this.saving || !this.scope.getSnapshot().writable || plan.some((entry) => entry.op === undefined)) return
+    if (!plan.length || this.saving || !this.scope.getSnapshot().writable || plan.some((entry) => entry.run === undefined && entry.op === undefined)) return
     this.saving = true
     this.failed = false
     this.publish()
     try {
-      const landed = await this.scope.mutate(plan.map((entry) => entry.op))
-      if (landed) this.staged.clear()
+      const ops = plan.flatMap((entry) => (entry.op === undefined ? [] : [entry.op]))
+      let landed = !ops.length || (await this.scope.mutate(ops, this.baseline?.revision))
+      if (!landed) {
+        this.failed = true
+        return
+      }
+      for (const entry of plan) if (entry.run) landed = (await entry.run()) && landed
+      if (landed) {
+        this.staged.clear()
+        this.baseline = undefined
+      }
       this.failed = !landed
     } catch {
       this.failed = true

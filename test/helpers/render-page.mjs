@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import * as primitives from './primitives-double.mjs'
-import { loadBundle } from './load-bundle.mjs'
+import { loadBundle, ROOT } from './load-bundle.mjs'
 
 /**
  * Render the plugin's Plugins-page configuration form and print a JSON report.
@@ -18,6 +20,11 @@ import { loadBundle } from './load-bundle.mjs'
  * is made. The third run removes `navigator` entirely, which must produce the
  * "could not be determined" line and no warning — an unknown host must not be
  * reported as an unsupported one.
+ *
+ * The report also carries the dictionaries the bundle registered and the keys
+ * its source asks for, so the test can check every key the page uses against
+ * the dictionary that answers it — not only the generated `field.` and `group.`
+ * keys a rendered markup would show.
  */
 
 const report = {
@@ -29,6 +36,8 @@ const report = {
   fieldLabels: [],
   injectKeys: [],
   hostApi: {},
+  dictionaryKeys: { en: [], zh: [] },
+  usedKeys: [],
 }
 
 /** The values the fake host serves, matching the plugin's declared defaults. */
@@ -216,6 +225,19 @@ try {
   report.failures.push(`apply() threw: ${error.message}`)
 }
 
+// The dictionaries the bundle registered, and every key its source asks for.
+// A key the dictionary does not answer is what the harness locale renders as
+// the key itself, so the pair is what the test checks.
+const registeredDictionaries = registered.dictionaries.at(-1)?.dictionaries ?? {}
+report.dictionaryKeys = {
+  en: Object.keys(registeredDictionaries.en ?? {}).sort(),
+  zh: Object.keys(registeredDictionaries.zh ?? {}).sort(),
+}
+report.usedKeys = [...new Set(
+  [...readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8').matchAll(/\bt\(\s*(['"])([^'"]+)\1/g)]
+    .map((match) => match[2]),
+)].sort()
+
 // ── the pure host-check logic, independent of the render ────────────────────
 try {
   const api = exported.HOST_API
@@ -306,6 +328,19 @@ if (registered.component === undefined) {
       props.edit('bootTimeoutSeconds', '120')
       report.variants.macosReverted = renderToStaticMarkup(React.createElement(component, props))
       props.discard()
+      // A pending reset is a pending change. The fixture's only override carries
+      // the value its base already holds, so the reset stages that base value as
+      // its text — the one draft whose text reads as "no change" while the model
+      // still holds the `unset` the reset means.
+      props.resetField('bootTimeoutSeconds')
+      report.variants.macosReset = renderToStaticMarkup(React.createElement(component, props))
+      props.discard()
+      // A write in flight: the model stays in its saving state until the write
+      // settles, and the bar's own status line is the message the dictionary
+      // carries.
+      props.edit('bootTimeoutSeconds', '90')
+      props.save()
+      report.variants.macosSaving = renderToStaticMarkup(React.createElement(component, props))
     } catch (error) {
       report.failures.push(`staged render threw: ${error.stack ?? error.message}`)
     }

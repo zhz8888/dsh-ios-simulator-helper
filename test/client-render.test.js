@@ -237,14 +237,36 @@ test('a draft that reverts to the value in effect stops counting as an edit', ()
   assert.equal(badges(reverted), 1, 'a reverted draft must not raise the overridden badge')
 })
 
+test('a pending reset keeps the form dirty and the action bar present', () => {
+  // The fixture's only override carries the value its base already holds, so a
+  // reset stages that base value as its text: the one draft whose text reads as
+  // "no change" while the model still holds the `unset` the reset means. The
+  // page has to keep offering the save that applies it.
+  const markup = report.variants.macosReset
+  assert.match(markup, /class="ismh_actions"/, 'a pending reset keeps the bar')
+  assert.match(markup, /Unsaved changes/)
+  const save = /<button[^>]*data-variant="primary"[^>]*>/.exec(markup)?.[0]
+  assert.ok(save !== undefined && !save.includes('disabled'), 'a pending reset must be saveable')
+})
+
+test('a write in flight shows the message the dictionary carries', () => {
+  const markup = report.variants.macosSaving
+  assert.match(markup, /Saving…/, 'the bar names the write that is running')
+  assert.ok(!/>writing</.test(markup), 'the saving state must not render an unresolved key')
+})
+
 test('the bar state machine covers clean, pending, blocked and failed', () => {
   const bar = report.actionBar
   assert.equal(bar.clean, null, 'a clean form has nothing to say')
   assert.deepEqual(bar.dirty, { tone: 'pending', message: 'pendingWrite', canSave: true, canDiscard: true })
   assert.equal(bar.saving.tone, 'pending')
+  // The message is part of the state: an unresolved key is rendered as the key
+  // itself, so the bar must name a dictionary entry in every state.
+  assert.equal(bar.saving.message, 'saving', 'the saving state names the message the dictionary carries')
   assert.equal(bar.saving.canSave, false, 'a write in flight must not be started twice')
   assert.equal(bar.saving.canDiscard, false, 'nor discarded while it is being written')
   assert.equal(bar.invalid.tone, 'error')
+  assert.equal(bar.invalid.message, 'writeBlocked', 'a blocked draft names the message the dictionary carries')
   assert.equal(bar.invalid.canSave, false, 'an invalid draft must not be savable')
   assert.deepEqual(bar.failed, { tone: 'error', message: 'writeFailed', canDiscard: true, canSave: false })
   assert.equal(bar.failedDraft.canSave, true, 'a failed write with valid edits may be retried')
@@ -263,4 +285,13 @@ test('no unresolved dictionary key leaks into the markup', () => {
     assert.ok(!/field\.[A-Za-z]+/.test(markup), `an unresolved field key leaked into the ${host} markup`)
     assert.ok(!/group\.[A-Za-z]+/.test(markup), `an unresolved group key leaked into the ${host} markup`)
   }
+  // Every key the bundle asks for is answered by the dictionary it registered, in
+  // both languages — the generated keys included, which no single render shows.
+  for (const language of ['en', 'zh']) {
+    const known = new Set(report.dictionaryKeys[language])
+    for (const key of report.usedKeys) {
+      assert.ok(known.has(key), `the ${language} dictionary has no entry for "${key}"`)
+    }
+  }
+  assert.deepEqual(report.dictionaryKeys.en, report.dictionaryKeys.zh, 'the two dictionaries carry the same keys')
 })

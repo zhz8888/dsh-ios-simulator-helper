@@ -401,14 +401,17 @@ test('a child that traps SIGTERM does not keep the call open', async () => {
   assert.equal(raced.out.timed, true)
 })
 
-test('the timeout still bounds a call whose child exits before it', async () => {
-  // The direct child leaves a grandchild holding its pipes: `close` never fires
-  // while that grandchild lives, so the grace timer has to settle the call.
+test('the timeout still bounds a call whose child already exited', async () => {
+  // The direct child exits 0 but leaves a grandchild holding its pipes, so
+  // `close` never fires while that grandchild lives and the grace timer is what
+  // settles the call. The exit code is reported as the success it was: a
+  // timeout is only a timeout when the child was still running when it fired.
   const started = Date.now()
   const out = await run(['sh', '-c', 'sleep 30 & exit 0'], { timeout: 300 })
   const elapsed = Date.now() - started
-  assert.equal(out.timed, true, 'the call must report that it timed out')
-  assert.ok(elapsed < 5_000, `the call must return after the timeout plus the grace period, took ${elapsed}ms`)
+  assert.equal(out.code, 0, 'the exit code the command produced')
+  assert.equal(out.timed, false, 'the command had already exited when the timer fired')
+  assert.ok(elapsed < 5_000, `the call must settle instead of waiting for the grandchild, took ${elapsed}ms`)
 })
 
 test('a runaway child output is capped instead of buffered without limit', async () => {

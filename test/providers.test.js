@@ -6,7 +6,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { readSettings } from '../lib/settings.js'
 import { defaultDataRoot, displayPath, inside, readablePath, rel } from '../lib/util/path.js'
-import { run, splitArgumentLines } from '../lib/util/run.js'
+import { failureText, run, splitArgumentLines, tail } from '../lib/util/run.js'
 import { toLosslessJson, truncate } from '../lib/util/content.js'
 import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/providers/host.js'
 import { alreadyShutdownText, chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
@@ -376,6 +376,44 @@ test('a child that traps SIGTERM does not keep the call open', async () => {
   ])
   assert.equal(raced.settled, true, 'the call must end once the timeout elapsed')
   assert.equal(raced.out.timed, true)
+})
+
+test('the timeout still bounds a call whose child exits before it', async () => {
+  // The direct child leaves a grandchild holding its pipes: `close` never fires
+  // while that grandchild lives, so the grace timer has to settle the call.
+  const started = Date.now()
+  const out = await run(['sh', '-c', 'sleep 30 & exit 0'], { timeout: 300 })
+  const elapsed = Date.now() - started
+  assert.equal(out.timed, true, 'the call must report that it timed out')
+  assert.ok(elapsed < 5_000, `the call must return after the timeout plus the grace period, took ${elapsed}ms`)
+})
+
+test('a runaway child output is capped instead of buffered without limit', async () => {
+  const out = await run([process.execPath, '-e', 'process.stdout.write("x".repeat(9 * 1024 * 1024))'], {
+    timeout: 20_000,
+  })
+  assert.equal(out.code, 0)
+  assert.ok(out.stdout.length < 9 * 1024 * 1024, 'the buffer must be capped')
+  assert.match(out.stdout, /output truncated after 8388608 bytes/)
+})
+
+test('a killed command without output still reports what happened', () => {
+  assert.match(
+    failureText({ cmd: ['xcrun', 'simctl', 'list', 'devices'], code: 1, stdout: '', stderr: '', timed: true }),
+    /timed out without producing output/,
+  )
+  assert.match(
+    failureText({ cmd: ['x'], code: 7, stdout: '', stderr: '', timed: false }),
+    /exited with code 7 without producing output/,
+  )
+  assert.equal(failureText({ cmd: ['x'], code: 1, stdout: 'boom', stderr: '', timed: false }), 'boom')
+})
+
+test('a build tail keeps the end of the output', () => {
+  const text = `head\n${'x'.repeat(200)}\n** BUILD FAILED **`
+  const result = tail({ cmd: ['xcodebuild'], code: 65, stdout: text, stderr: '', timed: false }, 40)
+  assert.match(result, /BUILD FAILED \*\*$/)
+  assert.match(result, /\[truncated \d+ characters\]/)
 })
 
 test('the build timeout argument is validated, not trusted', () => {

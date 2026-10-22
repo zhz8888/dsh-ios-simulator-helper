@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import process from 'node:process'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { decodePng, pixelAt } from '../test/helpers/decode-png.mjs'
+import { runStep, summaryLines } from './lib/smoke-report.mjs'
 import { createRuntime } from '../lib/runtime.js'
 import { inventory, preflight } from '../lib/providers/preflight.js'
 import { app, runApp } from '../lib/providers/build.js'
@@ -55,20 +58,55 @@ const dataDirArg = dataDirIndex === -1 ? undefined : process.argv[dataDirIndex +
 /**
  * Run one named step, printing its result and continuing on failure.
  *
+ * The reporting itself lives in `scripts/lib/smoke-report.mjs` so a unit test
+ * can pin it without driving the machine; `pnpm test` never runs this script.
+ *
  * @template T
  * @param {string} name - the step label.
  * @param {() => Promise<T>} run - the step body.
  * @returns {Promise<{ok: true, value: T} | {ok: false, error: unknown}>} the outcome.
  */
-async function step(name, run) {
-  process.stdout.write(`\n=== ${name} ===\n`)
-  try {
-    const value = await run()
-    console.log(JSON.stringify(value, null, 2))
-    return { ok: true, value }
-  } catch (error) {
-    console.log(`FAILED: ${error instanceof Error ? error.message : String(error)}`)
-    return { ok: false, error }
+function step(name, run) {
+  return runStep(name, run, { write: (text) => process.stdout.write(text), log: (value) => console.log(value) })
+}
+
+/**
+ * Measure one capture, so a blank frame is a finding rather than a green step.
+ *
+ * A device pair (Xcode 26's `iPhone Duo`) makes `simctl io <udid> screenshot`
+ * capture its secondary display by default, and that display renders black —
+ * the plugin answers `ok: true` with a uniformly black PNG unless the capture
+ * asks for the primary display. A byte count cannot tell the two apart, so the
+ * frame is decoded and sampled: a real screen is bright somewhere.
+ *
+ * The decoder is the test suite's own — this script and `test/manifest.test.js`
+ * are its only users, and the plugin itself never decodes a PNG.
+ *
+ * @param {string} file - the captured PNG.
+ * @returns {{width: number, height: number, meanLuma: number, nonBlackPercent: number, sampled: number}} the statistics.
+ */
+function captureStats(file) {
+  const image = decodePng(readFileSync(file))
+  // Every seventh pixel in both directions: a screenshot is millions of pixels
+  // and the question is only "is any of it lit", not what it shows.
+  const stride = 7
+  let sum = 0
+  let sampled = 0
+  let lit = 0
+  for (let y = 0; y < image.height; y += stride) {
+    for (let x = 0; x < image.width; x += stride) {
+      const { r, g, b } = pixelAt(image, x, y)
+      sum += 0.299 * r + 0.587 * g + 0.114 * b
+      if (r + g + b > 24) lit += 1
+      sampled += 1
+    }
+  }
+  return {
+    width: image.width,
+    height: image.height,
+    meanLuma: Math.round((sum / sampled) * 100) / 100,
+    nonBlackPercent: Math.round((lit / sampled) * 1000) / 10,
+    sampled,
   }
 }
 
@@ -156,7 +194,16 @@ if (withSimulator && runtime.platform === 'darwin') {
     results.screenshot = (
       await step('ios_screenshot', async () => {
         const capture = await shot(runtime, { udid: simulator.udid })
-        return { simulator: capture.simulator.name, path: capture.path, bytes: capture.bytes }
+        const stats = captureStats(capture.absolutePath)
+        // A capture that succeeded but shows nothing is the failure D1 found:
+        // the command exits 0, the PNG is valid, and every pixel is black.
+        if (stats.nonBlackPercent === 0) {
+          throw new Error(
+            `the capture at ${capture.absolutePath} is uniformly black (${stats.width}x${stats.height}, `
+              + `meanLuma ${stats.meanLuma}) — the command succeeded but the frame is not the screen`,
+          )
+        }
+        return { simulator: capture.simulator.name, path: capture.path, bytes: capture.bytes, ...stats }
       })
     ).ok
 
@@ -194,11 +241,5 @@ if (withSimulator) {
   else await rm(root, { recursive: true, force: true })
 }
 
-const failed = Object.entries(results).filter(([, ok]) => ok !== true).map(([name]) => name)
-console.log(`\nsteps: ${Object.keys(results).length}, failed: ${failed.length === 0 ? 'none' : failed.join(', ')}`)
-if (!preflightReady) {
-  console.log('preflight verdict: not ready (see the failing checks above)')
-} else {
-  console.log(`preflight verdict: ready${withSimulator ? '' : ' (read-only run; pass --with-simulator for the full loop)'}`)
-}
+for (const line of summaryLines(results, preflightReady, withSimulator)) console.log(line)
 process.exit(0)

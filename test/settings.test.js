@@ -157,6 +157,16 @@ test('a malformed number falls back instead of reaching the providers', () => {
   assert.equal(settings.logLimit, 20000)
 })
 
+test('the number fields refuse a zero, which is no usable timeout or limit', () => {
+  // The schema is what the configuration page validates against, so a zero has
+  // to be refused there. Stored, it would read back as the field's default,
+  // and the page would show a value the plugin does not use.
+  assert.throws(() => Config({ bootTimeoutSeconds: 0 }), /bootTimeoutSeconds/)
+  assert.throws(() => Config({ buildTimeoutSeconds: 0 }), /buildTimeoutSeconds/)
+  assert.throws(() => Config({ logLimit: 0 }), /logLimit/)
+  assert.doesNotThrow(() => Config({ bootTimeoutSeconds: 1 }))
+})
+
 test('booleans accept the shell spellings and otherwise keep the default', () => {
   assert.equal(readSettings(liveConfig({ autoBootSimulator: 'yes' }), {}).autoBootSimulator, true)
   assert.equal(readSettings(liveConfig({ autoBootSimulator: false }), {}).autoBootSimulator, false)

@@ -54,9 +54,11 @@ function compareLocalized(subject, part, host, client) {
   }
 }
 
-// The externals are checked from the source text, before the bundle is
-// evaluated: the loader's own assertion fires first and would report an
-// undeclared module as a raw stack trace instead of a curated problem. A
+// The externals and the classic-script rule are checked from the source text,
+// before the bundle is evaluated: the loader's own assertion fires first and
+// would report an undeclared module as a raw stack trace instead of a curated
+// problem, and the loader evaluates a classic script with `new Function(...)`,
+// which rejects a top-level `import` or `export` with a SyntaxError. A
 // failure here stops the run, because the loader cannot even evaluate the
 // bundle once an undeclared module is in it.
 const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
@@ -70,6 +72,9 @@ for (const specifier of declaredExternals) {
         + " (add it to dsh.client.external and to the loader's static module table)",
     )
   }
+}
+if (/^\s*(import|export)\s/m.test(clientSource)) {
+  fail('the client bundle must be a classic script: no import/export statements')
 }
 if (failures.length > 0) {
   console.error(`check-bundle: ${failures.length} problem(s)\n`)
@@ -184,6 +189,18 @@ if (clientGroups.length !== FIELD_GROUPS.length) {
       fail(`group ${index}: host id ${host.id} != client id ${client.id}`)
       continue
     }
+    // Which card a field renders on is part of the table, not decoration: the
+    // page draws one card per group, so a field moved to another group on the
+    // client side alone would leave the two halves describing different
+    // layouts. The client publishes each group's field keys for this check.
+    const hostFields = host.fields.map((field) => field.key)
+    const clientFields = Array.isArray(client.fields) ? client.fields : []
+    if (hostFields.join(',') !== clientFields.join(',')) {
+      fail(
+        `group "${host.id}": host fields [${hostFields.join(', ')}]`
+          + ` != client fields [${clientFields.join(', ')}]`,
+      )
+    }
     compareLocalized(`group "${host.id}"`, 'title', host.title, client.title)
     compareLocalized(`group "${host.id}"`, 'hint', host.hint, client.hint)
   }
@@ -226,9 +243,6 @@ if (hostInfo?.hostVerdict({ platform: 'linux', supported: false }, { supported: 
 }
 
 // --- client bundle hygiene -------------------------------------------------
-if (/^\s*(import|export)\s/m.test(clientSource)) {
-  fail('the client bundle must be a classic script: no import/export statements')
-}
 // The loader already refuses a module outside the shell's static table, so
 // what reaches this point is the set the bundle actually asked for. It is
 // compared against the same table rather than a hand-written subset of it: the

@@ -421,6 +421,19 @@ test('a reported path is relative inside the workspace and absolute outside it',
   assert.equal(displayPath(cwd, '/Users/me/elsewhere/shot.png'), '/Users/me/elsewhere/shot.png')
 })
 
+test('every fix hint that points at the configuration page names the page that exists', () => {
+  // The configuration page moved to the Plugins panel; a message that still
+  // names the old Settings page sends the user somewhere with no form.
+  for (const file of ['sim.js', 'ui.js', 'preflight.js']) {
+    const source = readFileSync(new URL(`../lib/providers/${file}`, import.meta.url), 'utf8')
+    assert.doesNotMatch(source, /Settings -> iOS Simulator/, `${file} still names the old settings page`)
+  }
+  for (const file of ['sim.js', 'ui.js']) {
+    const source = readFileSync(new URL(`../lib/providers/${file}`, import.meta.url), 'utf8')
+    assert.match(source, /PAGE_LOCATION/, `${file} must point at the page through PAGE_LOCATION`)
+  }
+})
+
 test('the data root falls back from DSH_HOME to the user home to temp', () => {
   assert.equal(defaultDataRoot({ DSH_HOME: '/opt/dsh' }), '/opt/dsh/ios-simulator-helper')
   assert.equal(defaultDataRoot({}), path.join(os.homedir(), '.dsh', 'ios-simulator-helper'))

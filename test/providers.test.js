@@ -12,7 +12,7 @@ import { hostInfo, isSupportedHost, platformLabel, requireMacOS } from '../lib/p
 import { chooseSimulator, isIosRuntime, parseRuntimes, parseSimulators, simulatorAppAttempts, validUdid, list } from '../lib/providers/sim.js'
 import { clampLimit, clampSeconds } from '../lib/providers/logs.js'
 import { appBundleId, cleanAppName, deploymentTarget, slugify } from '../lib/providers/project.js'
-import { macroSandboxDenied, pickAppProduct } from '../lib/providers/build.js'
+import { macroSandboxDenied, pickAppProduct, requestedTimeoutMs } from '../lib/providers/build.js'
 import { PAGE_LOCATION, preflight } from '../lib/providers/preflight.js'
 import { status as uiStatus, unavailableMessage } from '../lib/providers/ui.js'
 
@@ -357,6 +357,34 @@ test('the workspace guard resolves a symlink that leaves the workspace', async (
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('a timeout the timer cannot represent does not kill the child instantly', async () => {
+  // Node's timers take a 32-bit signed delay, so a larger one overflows to
+  // 1 ms: the child would be killed before it started and the call would
+  // report a timeout that never elapsed.
+  const out = await run([process.execPath, '-e', 'setTimeout(() => {}, 300)'], { timeout: 2 ** 31 })
+  assert.equal(out.code, 0)
+  assert.equal(out.timed, false)
+})
+
+test('a child that traps SIGTERM does not keep the call open', async () => {
+  const trap = 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'
+  const raced = await Promise.race([
+    run([process.execPath, '-e', trap], { timeout: 200 }).then((out) => ({ settled: true, out })),
+    new Promise((resolve) => setTimeout(() => resolve({ settled: false }), 15_000)),
+  ])
+  assert.equal(raced.settled, true, 'the call must end once the timeout elapsed')
+  assert.equal(raced.out.timed, true)
+})
+
+test('the build timeout argument is validated, not trusted', () => {
+  assert.equal(requestedTimeoutMs(600_000), 600_000)
+  assert.equal(requestedTimeoutMs(undefined), undefined)
+  assert.equal(requestedTimeoutMs(0), undefined)
+  assert.equal(requestedTimeoutMs(-1), undefined)
+  assert.equal(requestedTimeoutMs(Number.NaN), undefined)
+  assert.equal(requestedTimeoutMs(2 ** 31), undefined)
 })
 
 test('a reported path is relative inside the workspace and absolute outside it', () => {

@@ -297,7 +297,7 @@ test('the log window and limit are clamped, never trusted', () => {
   assert.equal(clampSeconds(99999), 3600)
   assert.equal(clampLimit(undefined), 20000)
   assert.equal(clampLimit(10), 1000)
-  assert.equal(clampLimit(999999), 200000)
+  assert.equal(clampLimit(999999), 20000, 'the renderer keeps 24k for the whole result')
 })
 
 test('argv assembly ignores blanks and comments and keeps inner spaces', () => {

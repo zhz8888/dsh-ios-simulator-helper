@@ -40,7 +40,17 @@ yarn-error.log*
 *.tmp
 *.temp
 .cache/
-/*.png
+# A build's DerivedData tree. `ios_build_app` resolves `derivedDataPath`
+# inside the session workspace and the `derivedDataDir` setting is resolved
+# against it, so the tree lands in the checkout whenever the workspace is
+# the repository.
+DerivedData/
+# A screenshot lands in the session workspace as well, so the rule covers
+# every depth rather than the package root alone.
+*.png
+# ...except the curated marketplace screenshots: `assets/` holds the four
+# hand-picked frames `screenshots.json` declares to a plugin market.
+!assets/*.png
 # ...except the plugin icon: `package.json` names it and `dsh-app-boot` resolves
 # it inside the manifest directory, so it has to sit at the package root.
 !/ios-simulator.png

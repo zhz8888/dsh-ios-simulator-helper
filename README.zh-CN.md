@@ -211,7 +211,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## 版本与发布
 
-每个版本都是同一个提交出现在两处：在 `main` 上打 `vX.Y.Z` tag，并从该 tag 发布到 npm，npm 记录的 `gitHead` 就是这个提交。版本列表见 [Releases](https://github.com/zhz8888/dsh-ios-simulator-helper/releases)——最新为 [`v1.1.3`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.3)（2026-10-20），其前是 [`v1.1.2`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.2)（2026-10-19）、[`v1.1.1`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.1)、[`v1.1.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) 与 [`v1.0.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0)，后三个版本同为 2026-10-17。
+每个版本都是同一个提交出现在两处：在 `main` 上打 `vX.Y.Z` tag，并从该 tag 发布到 npm，npm 记录的 `gitHead` 就是这个提交。版本列表见 [Releases](https://github.com/zhz8888/dsh-ios-simulator-helper/releases)——最新为 [`v1.2.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.2.0)（2026-10-23），其前是 [`v1.1.3`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.3)（2026-10-20）、[`v1.1.2`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.2)（2026-10-19）、[`v1.1.1`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.1)、[`v1.1.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.1.0) 与 [`v1.0.0`](https://github.com/zhz8888/dsh-ios-simulator-helper/releases/tag/v1.0.0)，后三个版本同为 2026-10-17。
 
 ## 参与贡献
 

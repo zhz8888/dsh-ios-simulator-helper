@@ -103,7 +103,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 | 分组 | 设置项 | 类型 | 默认值 | 原插件环境变量回落 | 说明 |
 |---|---|---|---|---|---|
-| 模拟器与设备 | `defaultDevice` | 下拉（本机已有模拟器） | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | 工具未指定 `udid`/`device` 时使用的模拟器，从本机已有设备中选择；本机已不存在的值会标注出来，并退回第一个可用 iPhone |
+| 模拟器与设备 | `defaultDevice` | 下拉（本机已有模拟器） | 空 | `IOS_SIM_DEFAULT_DEVICE` | 工具未指定 `udid`/`device` 时使用的模拟器，从本机已有设备中选择。留空表示使用插件自身的回退规则——原插件的 `iPhone 16` 片段，再退回第一个可用 iPhone；本机已不存在的值会标注出来 |
 | | `defaultRuntime` | 下拉（本机已装运行时） | 空 | `IOS_SIM_DEFAULT_RUNTIME` | 工具未指定运行时时优先使用的已装运行时，从本机已有运行时中选择；第一项不限运行时。**偏好而非要求**：值过期时自动放宽而不是报错 |
 | | `autoBootSimulator` | 开关 | 开 | `IOS_SIM_AUTO_BOOT` | 关闭后，目标未启动时直接报错，不替你执行 `simctl boot` |
 | | `autoOpenSimulator` | 开关 | 开 | `IOS_SIM_AUTO_OPEN` | 与原插件一致地打开模拟器窗口（启动/显示/打开 URL/构建并运行）；关闭后只做 `simctl` 操作 |

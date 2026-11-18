@@ -52,7 +52,11 @@ test('the device and the runtime are discovery fields, not free text', () => {
   // The value stays an ordinary string: the set of names this machine has is
   // discovered at run time, and a schema that policed it would have to spawn
   // simctl on every write.
-  assert.equal(FIELDS.get('defaultDevice').default, 'iPhone 16')
+  // Both default to nothing, and both mean something different from the
+  // plugin's own fallback: the setting holds the simulator the user picked, and
+  // the fallback is not a name this machine necessarily has. A device name as
+  // the default would open the page on a value it has to mark as missing.
+  assert.equal(FIELDS.get('defaultDevice').default, '')
   assert.equal(FIELDS.get('defaultRuntime').default, '')
 })
 
@@ -121,7 +125,7 @@ test('the projection fills exactly the declared fields, with the type each kind 
 
 test('defaults are used when nothing is configured', () => {
   const settings = readSettings({}, {})
-  assert.equal(settings.defaultDevice, 'iPhone 16')
+  assert.equal(settings.defaultDevice, '')
   assert.equal(settings.defaultRuntime, '')
   assert.equal(settings.autoBootSimulator, true)
   assert.equal(settings.autoOpenSimulator, true)
@@ -257,7 +261,7 @@ test('booleans accept the shell spellings and otherwise keep the default', () =>
 
 test('a whitespace-only text setting is treated as unset', () => {
   const settings = readSettings(liveConfig({ defaultDevice: '   ', idbBinary: '\t' }), {})
-  assert.equal(settings.defaultDevice, 'iPhone 16')
+  assert.equal(settings.defaultDevice, '')
   assert.equal(settings.idbBinary, 'idb')
 })
 
@@ -267,4 +271,30 @@ test('the default device fragment never returns an empty string', () => {
   assert.equal(defaultDeviceFragment(undefined), 'iPhone 16')
 })
 
+test('the device setting stays unset when nothing is stored', () => {
+  // The setting holds the simulator the user picked, so an unset profile holds
+  // nothing: the page's not-set entry has to be a value it can keep. The
+  // plugin's own fallback is a separate question, and
+  // {@link defaultDeviceFragment} answers it.
+  const settings = readSettings(liveConfig({ defaultDevice: '' }), {})
+  assert.equal(settings.defaultDevice, '')
+  assert.equal(defaultDeviceFragment(settings), 'iPhone 16')
+})
+
+test('the legacy environment variable configures the device when nothing is stored', () => {
+  // The live config resolves the schema default even when the user stored
+  // nothing, so a discovery field whose default was a device name would shadow
+  // the environment variable for good: the projection would never see an empty
+  // value, the `IOS_SIM_*` fallback would be dead, and the page would open on
+  // a device this machine may not have.
+  assert.equal(
+    readSettings(liveConfig({ defaultDevice: '' }), { IOS_SIM_DEFAULT_DEVICE: 'iPad Air 13-inch (M4)' }).defaultDevice,
+    'iPad Air 13-inch (M4)',
+  )
+  // A stored value still wins over the environment.
+  assert.equal(
+    readSettings(liveConfig({ defaultDevice: 'iPhone 17' }), { IOS_SIM_DEFAULT_DEVICE: 'iPad Air 13-inch (M4)' }).defaultDevice,
+    'iPhone 17',
+  )
+})
 

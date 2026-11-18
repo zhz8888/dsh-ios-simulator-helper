@@ -123,6 +123,20 @@ test('the /inventory route answers with the discovery payload', async () => {
   assert.equal(typeof body.current, 'object')
 })
 
+test('the live config leaves the device unset, so the page can clear it', async () => {
+  const { routes, fiber } = await mount()
+  // The live config resolves the schema default even when the user stored
+  // nothing. A default that is a device name would make the page open on a
+  // value this machine may not have — it has to mark it as missing — and it
+  // would clear back to that name instead of staying unset, because the
+  // schema default repopulates a cleared value.
+  assert.equal(fiber.config.defaultDevice.get(), '')
+  // The fragment the picker looks for is a separate question, and it keeps the
+  // original plugin's answer.
+  const body = await (await route(routes, '/inventory').fetch()).json()
+  assert.equal(body.current.defaultDevice, 'iPhone 16')
+})
+
 test('a route reads the live settings on every call, not the ones it saw at mount', async () => {
   const { routes, fiber } = await mount()
   seam.reset()

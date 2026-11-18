@@ -103,7 +103,7 @@ Saving happens in a pill that sticks to the bottom of the form: it appears while
 
 | Group | Field | Type | Default | Legacy env fallback | Notes |
 |---|---|---|---|---|---|
-| Simulator and device | `defaultDevice` | dropdown (this machine's simulators) | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | The simulator the tools use when a call names no `udid`/`device`, picked from the simulators this machine has; a value that is no longer installed is marked and falls back to the first available iPhone. |
+| Simulator and device | `defaultDevice` | dropdown (this machine's simulators) | empty | `IOS_SIM_DEFAULT_DEVICE` | The simulator the tools use when a call names no `udid`/`device`, picked from the simulators this machine has. Empty means the plugin's own fallback — the original plugin's `iPhone 16` fragment, then the first available iPhone; a value that is no longer installed is marked. |
 | | `defaultRuntime` | dropdown (this machine's runtimes) | empty | `IOS_SIM_DEFAULT_RUNTIME` | The installed runtime the tools prefer, picked from the runtimes this machine has; the first entry matches any runtime. A **preference, not a requirement**: a stale value widens the pool instead of erroring. |
 | | `autoBootSimulator` | switch | on | `IOS_SIM_AUTO_BOOT` | When off, tools fail instead of running `simctl boot` for a stopped target. |
 | | `autoOpenSimulator` | switch | on | `IOS_SIM_AUTO_OPEN` | Matches the original by opening the Simulator window (boot / show / open URL / build and run); off keeps everything headless. |

@@ -563,6 +563,42 @@ test('the /host route answers the macOS question without spawning anything', asy
   // the flag must be false, never a guess.
   assert.equal(body.supported, process.platform === 'darwin')
 })
+test('a settings reference that cannot be read answers with a body instead of rejecting', async () => {
+  // A volatile reference that throws is what a half-written or revoked
+  // profile entry looks like. The route must still answer: the configuration
+  // page fetches it and renders whatever comes back, so a rejected request
+  // leaves the page showing a transport error instead of a readable message.
+  const broken = {
+    get() {
+      throw new Error('the settings reference is broken')
+    },
+  }
+  const { registered } = mount(undefined, {}, { dataDir: broken })
+  for (const suffix of ['/status', '/inventory']) {
+    const route = registered.routes.find((item) => item.path.endsWith(suffix))
+    const response = await route.fetch()
+    assert.equal(response.status, 500, suffix + ' answers a body')
+    const body = await response.json()
+    assert.match(body.error, /the settings reference is broken/)
+  }
+})
+
+test('the /host route answers even when the settings references are broken', async () => {
+  // /host reads no setting and starts no subprocess, so it must not depend
+  // on the settings being readable at all.
+  const broken = {
+    get() {
+      throw new Error('the settings reference is broken')
+    },
+  }
+  const { registered } = mount(undefined, {}, { dataDir: broken, screenshotDir: broken })
+  const route = registered.routes.find((item) => item.path.endsWith('/host'))
+  const response = await route.fetch()
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.plugin, 'ios-simulator-helper')
+  assert.equal(body.requiredPlatform, 'darwin')
+})
 
 test('the plugin asks the settings service not to auto-generate a second form', () => {
   const { registered } = mount()

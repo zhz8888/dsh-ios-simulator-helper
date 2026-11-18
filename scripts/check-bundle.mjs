@@ -230,7 +230,12 @@ if (hostPrefix === undefined) {
 } else {
   for (const route of ['host', 'status', 'inventory']) {
     if (!clientSource.includes(`"${hostPrefix}/${route}"`)) fail(`the client page does not call the host route ${route}`)
-    if (!hostSource.includes(`route('${route}'`)) fail(`lib/index.js does not register the ${route} route`)
+    // Any helper that registers a route counts: the name of the helper is an
+    // implementation detail, and the gate's question is whether the route is
+    // registered at all.
+    if (!new RegExp(`\\w*[Rr]oute\\('${route}'`).test(hostSource)) {
+      fail(`lib/index.js does not register the ${route} route`)
+    }
   }
 }
 

@@ -20,7 +20,7 @@ The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `l
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 227 tests over 14 suite files, no Xcode and no simulator needed
+pnpm test                    # 228 tests over 14 suite files, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
 pnpm run typecheck           # tsc --noEmit over both halves — the type gate, no build
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount + typecheck

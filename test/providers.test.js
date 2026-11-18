@@ -163,6 +163,31 @@ test('a runtime fragment filters the candidates', () => {
   assert.equal(configured.name, 'iPhone 18 Pro')
 })
 
+test('a configured runtime matches its own runtime and not a longer name', () => {
+  // The configuration page stores the tail of a runtime identifier, so
+  // 'iOS-27-1' must select the 27.1 runtime and not the 27.10 one: a plain
+  // substring match would accept both, and the page offers them as separate
+  // choices.
+  const two = parseSimulators(
+    JSON.stringify({
+      devices: {
+        'com.apple.CoreSimulator.SimRuntime.iOS-27-1': [
+          { name: 'iPhone 17', udid: 'E799AFD7-C83C-4DD2-AD27-B11DDA87EFAC', state: 'Shutdown', isAvailable: true },
+        ],
+        'com.apple.CoreSimulator.SimRuntime.iOS-27-10': [
+          { name: 'iPhone 16', udid: 'DFE2014B-F70A-4263-89E7-39018BE4E2A2', state: 'Shutdown', isAvailable: true },
+        ],
+      },
+    }),
+  )
+  assert.equal(chooseSimulator(two, {}, { defaultRuntime: 'iOS-27-1' }).name, 'iPhone 17')
+  assert.equal(chooseSimulator(two, {}, { defaultRuntime: 'iOS-27-10' }).name, 'iPhone 16')
+  // A fragment that names no runtime exactly stays a preference: it widens to
+  // every 27 runtime and breaks nothing.
+  assert.equal(chooseSimulator(two, { device: 'iPhone 17' }, { defaultRuntime: 'iOS-27' }).name, 'iPhone 17')
+  assert.equal(chooseSimulator(two, { device: 'iPhone 16' }, { defaultRuntime: 'iOS-27' }).name, 'iPhone 16')
+})
+
 /**
  * Xcode 26 replaced Simulator.app with Device Hub under Contents/Applications,
  * so `open -a Simulator` alone can no longer show a window. The attempt list is

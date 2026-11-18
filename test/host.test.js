@@ -70,7 +70,7 @@ const ADDED_TOOLS = ['ios_shutdown_simulator']
  * @returns {{ctx: object, registered: object, services: string[]}} the stand-in.
  */
 function fakeContext(services = ['tools', 'skills', 'commands', 'connection', 'settings'], overrides = {}, extraStores = {}) {
-  const registered = { tools: [], disposers: [], skills: [], commands: [], routes: [], settingsPolicy: [] }
+  const registered = { tools: [], disposers: [], skills: [], commands: [], routes: [], settingsPolicy: [], injections: [] }
   const stores = {
     tools: {
       register: (definition) => {
@@ -105,6 +105,12 @@ function fakeContext(services = ['tools', 'skills', 'commands', 'connection', 's
     effect: (callback) => {
       const disposer = callback()
       return typeof disposer === 'function' ? disposer : () => {}
+    },
+    // The web server publishes its index-injection rows through an event; the
+    // plugin listens for one to hand the configuration page its copy.
+    on: (event, listener) => {
+      registered.injections.push({ event, listener })
+      return () => {}
     },
   }
   for (const name of services) ctx[name] = stores[name]
@@ -600,6 +606,24 @@ test('the /host route answers even when the settings references are broken', asy
   assert.equal(body.requiredPlatform, 'darwin')
 })
 
+test('the configuration page is handed its copy through the index-injection table', () => {
+  // The copy is not a Fetch route: a route answers after the page has started
+  // drawing, and the page would show raw keys until it landed. The web server
+  // publishes the dictionaries ahead of the bundle instead.
+  const { registered } = mount()
+  const injection = registered.injections.find((item) => item.event === 'webserver/index-inject')
+  assert.notEqual(injection, undefined, 'the plugin listens for the index-injection table')
+  const table = []
+  injection.listener(table)
+  assert.equal(table.length, 1)
+  assert.equal(table[0].kind, 'global')
+  assert.equal(table[0].name, plugin.LOCALE_GLOBAL)
+  assert.equal(typeof table[0].value.en, 'object')
+  assert.equal(typeof table[0].value.zh, 'object')
+  // The page looks every one of these up, so a missing key renders as itself.
+  assert.equal(typeof table[0].value.en['field.defaultDevice'], 'string')
+  assert.equal(typeof table[0].value.zh['field.defaultDevice'], 'string')
+})
 test('the plugin asks the settings service not to auto-generate a second form', () => {
   const { registered } = mount()
   assert.equal(registered.settingsPolicy.length, 1)

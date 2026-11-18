@@ -53,7 +53,7 @@ const plugin = await import('../lib/index.js')
  * caught here. The full registration contract lives in `test/host.test.js`.
  */
 function fullContext() {
-  const registered = { tools: [], skills: [], commands: [], routes: [] }
+  const registered = { tools: [], skills: [], commands: [], routes: [], injections: [] }
   const stores = {
     tools: { register: (definition) => (registered.tools.push(definition), () => {}) },
     skills: { register: (definition) => (registered.skills.push(definition), () => {}) },
@@ -74,6 +74,12 @@ function fullContext() {
     effect: (callback) => {
       const disposer = callback()
       return typeof disposer === 'function' ? disposer : () => {}
+    },
+    // The web server publishes its index-injection rows through an event; the
+    // plugin listens for one to hand the configuration page its copy.
+    on: (event, listener) => {
+      registered.injections.push({ event, listener })
+      return () => {}
     },
   }
   for (const name of Object.keys(stores)) ctx[name] = stores[name]

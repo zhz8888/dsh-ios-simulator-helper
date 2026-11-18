@@ -47,9 +47,30 @@ export function stubModule(extra = {}) {
 }
 
 /**
+ * The page-initialization globals a real page carries.
+ *
+ * The host half publishes the plugin's copy under this name, and the web server
+ * renders it into the document head ahead of the bundle. A test that loads the
+ * bundle therefore has to install it too, or the page renders its dictionary
+ * keys.
+ *
+ * @returns {Record<string, unknown>} the globals to install around the factory.
+ */
+export function pageGlobals() {
+  const read = (language) => {
+    const file = path.join(ROOT, 'locale', `${language}.json`)
+    const parsed = JSON.parse(readFileSync(file, 'utf8'))
+    const settings = parsed?.settings
+    assert.ok(settings && typeof settings === 'object', `${file} declares no settings object`)
+    return settings
+  }
+  return { __DSH_IOS_SIMULATOR_HELPER_LOCALE__: { en: read('en'), zh: read('zh') } }
+}
+
+/**
  * Evaluate `lib/client.js` and return the registration plus the module exports.
  *
- * @param {{resolve?: (specifier: string) => unknown}} [options] - module resolver override.
+ * @param {{resolve?: (specifier: string) => unknown, globals?: Record<string, unknown>}} [options] - module resolver override and the globals to install around the factory.
  * @returns {{registration: {id: string, factory: Function}, exported: object, required: string[]}} the outcome.
  */
 export function loadBundle(options = {}) {
@@ -89,5 +110,14 @@ export function loadBundle(options = {}) {
   const run = new Function('window', 'require', `${source}\nreturn undefined`)
   run(window, require)
   assert.ok(registration, 'the bundle did not call window.__ModuleLoader__.load')
-  return { registration, exported: registration.factory(require), required }
+  // The globals are installed around the FACTORY call, not around `run`: the
+  // factory body is the bundle's module scope, which is where the copy is read.
+  const globals = options.globals ?? {}
+  const installed = Object.keys(globals)
+  for (const name of installed) globalThis[name] = globals[name]
+  try {
+    return { registration, exported: registration.factory(require), required }
+  } finally {
+    for (const name of installed) delete globalThis[name]
+  }
 }

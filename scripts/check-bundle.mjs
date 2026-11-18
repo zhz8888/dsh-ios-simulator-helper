@@ -3,6 +3,7 @@ import process from 'node:process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { FIELD_GROUPS, FIELD_KEYS, FIELDS, SETTINGS_NAMESPACE } from '../lib/settings.js'
+import * as hostIndex from '../lib/index.js'
 import { ROOT, STATIC_MODULES, loadBundle } from '../test/helpers/load-bundle.mjs'
 
 /**
@@ -22,36 +23,6 @@ const failures = []
 /** Record one failed invariant. */
 function fail(message) {
   failures.push(message)
-}
-
-/**
- * Compare one localized string pair between the host table and the client.
- *
- * Both sides carry `{zh, en}`; a missing pair on either side is a difference
- * too, because a field that lost its hint on one side renders differently in
- * that language.
- *
- * @param {string} subject - what is being compared, for the message.
- * @param {string} part - the property name, for the message.
- * @param {{zh: string, en: string} | undefined} host - the host's value.
- * @param {{zh: string, en: string} | undefined} client - the client's value.
- */
-function compareLocalized(subject, part, host, client) {
-  if (host === undefined && client === undefined) return
-  if (host === undefined || client === undefined) {
-    fail(
-      `${subject}.${part}: host ${JSON.stringify(host ?? null)} != client ${JSON.stringify(client ?? null)}`,
-    )
-    return
-  }
-  for (const language of ['zh', 'en']) {
-    if (host[language] !== client[language]) {
-      fail(
-        `${subject}.${part}.${language}: host ${JSON.stringify(host[language])}`
-          + ` != client ${JSON.stringify(client[language])}`,
-      )
-    }
-  }
 }
 
 // The externals and the classic-script rule are checked from the source text,
@@ -170,17 +141,17 @@ for (const field of clientFields) {
       fail(`field "${field.key}": host options [${hostOptions}] != client options [${clientOptions}]`)
     }
   }
-  // The labels and hints are the bulk of the duplicated table — about 3,600
-  // characters across two languages — and comparing only the keys left every
-  // one of them unchecked. The client therefore publishes the same metadata
-  // the host declares, and the two are compared field by field here.
-  compareLocalized(`field "${field.key}"`, 'label', host.label, field.label)
-  compareLocalized(`field "${field.key}"`, 'hint', host.hint, field.hint)
-  if ((host.placeholder ?? undefined) !== (field.placeholder ?? undefined)) {
+  // The copy is not part of the duplicated table any more: it lives in the
+  // locale files, and the checks below compare the page's SHAPE with the
+  // host's. A placeholder is a flag on the client (the text is looked up by
+  // key), so the two agree on whether the field has one, not on what it says.
+  if ((host.placeholder !== undefined) !== (field.placeholder !== undefined)) {
     fail(
       `field "${field.key}": host placeholder ${JSON.stringify(host.placeholder ?? null)}`
         + ` != client placeholder ${JSON.stringify(field.placeholder ?? null)}`,
     )
+  } else if (field.placeholder !== undefined && field.placeholder !== true) {
+    fail(`field "${field.key}": the client placeholder must be the flag true, not ${JSON.stringify(field.placeholder)}`)
   }
   // The browser half refuses to stage a number outside the range the host
   // declares, so the two ranges are part of the duplicated table too.
@@ -217,8 +188,8 @@ if (clientGroups.length !== FIELD_GROUPS.length) {
           + ` != client fields [${clientFields.join(', ')}]`,
       )
     }
-    compareLocalized(`group "${host.id}"`, 'title', host.title, client.title)
-    compareLocalized(`group "${host.id}"`, 'hint', host.hint, client.hint)
+    // The group's title and hint are copy now, so they are not compared here:
+    // the dictionary checks below cover them.
   }
 }
 
@@ -239,6 +210,95 @@ if (hostPrefix === undefined) {
   }
 }
 
+// --- the copy lives in the locale files ------------------------------------
+// Every user-visible string is in `locale/en.json` and `locale/zh.json`. The
+// host half projects them into its field table and the browser half reads the
+// same two dictionaries from the page-initialization global the host
+// injects, so neither half carries a copy of its own. These checks are what
+// keep it that way.
+
+/** The two locale files' `settings` dictionaries. */
+const localeDictionary = (language) => {
+  const file = path.join(ROOT, 'locale', `${language}.json`)
+  const parsed = JSON.parse(readFileSync(file, 'utf8'))
+  const settings = parsed?.settings
+  if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+    fail(`locale/${language}.json must declare a "settings" object`)
+    return {}
+  }
+  return settings
+}
+
+const localeEn = localeDictionary('en')
+const localeZh = localeDictionary('zh')
+
+// The two files must declare the same keys. A key that exists in one and not
+// in the other renders as the key itself in that language.
+const enKeys = Object.keys(localeEn).sort()
+const zhKeys = Object.keys(localeZh).sort()
+if (enKeys.join(',') !== zhKeys.join(',')) {
+  const onlyEn = enKeys.filter((key) => !zhKeys.includes(key))
+  const onlyZh = zhKeys.filter((key) => !enKeys.includes(key))
+  fail(
+    `the locale files declare different keys`
+      + (onlyEn.length > 0 ? `; only in en: ${onlyEn.join(', ')}` : '')
+      + (onlyZh.length > 0 ? `; only in zh: ${onlyZh.join(', ')}` : ''),
+  )
+}
+
+// Every key the page can look up must exist in both files. The keys are
+// derived: the chrome the client exports, the groups and fields the host
+// declares, the placeholders the fields carry, and the option labels the
+// client lists.
+const expectedKeys = new Set()
+for (const key of exported.FIXED_KEYS ?? []) expectedKeys.add(key)
+for (const group of FIELD_GROUPS) {
+  expectedKeys.add(`group.${group.id}`)
+  expectedKeys.add(`group.${group.id}.hint`)
+}
+for (const field of FIELDS.values()) {
+  expectedKeys.add(`field.${field.key}`)
+  expectedKeys.add(`field.${field.key}.hint`)
+  if (field.placeholder !== undefined) expectedKeys.add(`field.${field.key}.placeholder`)
+}
+for (const field of clientFields) {
+  for (const value of field.optionLabel ?? []) expectedKeys.add(`option.${field.key}.${value}`)
+}
+for (const key of expectedKeys) {
+  if (typeof localeEn[key] !== 'string' || localeEn[key].length === 0) {
+    fail(`locale/en.json declares no "${key}"`)
+  }
+  if (typeof localeZh[key] !== 'string' || localeZh[key].length === 0) {
+    fail(`locale/zh.json declares no "${key}"`)
+  }
+}
+// A key the page never looks up is a key that will drift: it looks like copy
+// but nothing renders it, so nothing will ever notice it go stale.
+for (const key of enKeys) {
+  if (!expectedKeys.has(key)) fail(`locale/en.json declares "${key}", which no control looks up`)
+}
+
+// The browser half must carry no copy of its own: a `{zh, en}` literal or a
+// CJK string in the bundle is a second source that will drift.
+const inlineCopy = /\{\s*zh\s*:\s*["'`][^"'`]*["'`]\s*,\s*en\s*:/.exec(clientSource)
+if (inlineCopy !== null) {
+  fail('lib/client.js must not carry inline copy: a `{zh: …, en: …}` literal belongs in locale/en.json and locale/zh.json')
+}
+const cjk = /["'`][^"'`\n]*[\u4e00-\u9fff][^"'`\n]*["'`]/.exec(clientSource)
+if (cjk !== null) {
+  fail(`lib/client.js must not carry inline copy: the CJK string ${JSON.stringify(cjk[0])} belongs in locale/zh.json`)
+}
+
+// The two halves must agree on the name the copy is published under, or the
+// page renders its keys.
+if (exported.LOCALE_GLOBAL === undefined) {
+  fail('lib/client.js must export the name it reads the copy from')
+} else if (exported.LOCALE_GLOBAL !== hostIndex.LOCALE_GLOBAL) {
+  fail(
+    `the copy global differs: client ${JSON.stringify(exported.LOCALE_GLOBAL)}`
+      + ` != host ${JSON.stringify(hostIndex.LOCALE_GLOBAL)}`,
+  )
+}
 // --- the macOS-only notice -------------------------------------------------
 // The page must decide this without a request (a non-macOS browser must be told
 // immediately), and the host must expose the same verdict for confirmation.
@@ -282,5 +342,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `check-bundle: OK — bundle id, namespace, plugin surface, ${clientFields.length} fields, 3 routes, the macOS gate and script hygiene all agree.`,
+  `check-bundle: OK — bundle id, namespace, plugin surface, ${clientFields.length} fields, ${expectedKeys.size} locale keys, 3 routes, the macOS gate and script hygiene all agree.`,
 )

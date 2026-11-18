@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import * as primitives from './primitives-double.mjs'
-import { loadBundle, ROOT } from './load-bundle.mjs'
+import { loadBundle, pageGlobals, ROOT } from './load-bundle.mjs'
 
 /**
  * Render the plugin's Plugins-page configuration form and print a JSON report.
@@ -235,10 +235,14 @@ const { exported } = loadBundle({
     if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return primitivesWithToast
     throw new Error(`unexpected require in the render test: ${specifier}`)
   },
+  globals: pageGlobals(),
 })
 
 report.fieldKeys = (exported.FIELD_META ?? []).map((field) => field.key)
-report.fieldLabels = (exported.FIELD_META ?? []).map((field) => field.label?.en).filter(Boolean)
+// The labels live in the locale files now, so they are read from there rather
+// than from an export: the export carries the field's shape, not its copy.
+const dictionary = pageGlobals().__DSH_IOS_SIMULATOR_HELPER_LOCALE__.en
+report.fieldLabels = report.fieldKeys.map((key) => dictionary[`field.${key}`]).filter(Boolean)
 
 try {
   exported.apply(ctx)

@@ -63,7 +63,7 @@ const logger = { info() {}, warn() {}, error() {} }
  */
 function fakeContext(services = ['tools']) {
   /** @type {{tools: any[]}} */
-  const registered = { tools: [] }
+  const registered = { tools: [], injections: [] }
   const stores = {
     tools: {
       register: (definition) => {
@@ -83,6 +83,12 @@ function fakeContext(services = ['tools']) {
     effect: (callback) => {
       const disposer = callback()
       return typeof disposer === 'function' ? disposer : () => {}
+    },
+    // The web server publishes its index-injection rows through an event; the
+    // plugin listens for one to hand the configuration page its copy.
+    on: (event, listener) => {
+      registered.injections.push({ event, listener })
+      return () => {}
     },
   }
   for (const name of services) ctx[name] = stores[name]

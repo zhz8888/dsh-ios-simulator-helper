@@ -103,8 +103,8 @@ Saving happens in a pill that sticks to the bottom of the form: it appears while
 
 | Group | Field | Type | Default | Legacy env fallback | Notes |
 |---|---|---|---|---|---|
-| Simulator and device | `defaultDevice` | text (suggestions from this machine) | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | Device-name fragment used when a tool names no `udid`/`device`; falls back to the first available iPhone on a miss. |
-| | `defaultRuntime` | text (suggestions from installed runtimes) | empty | `IOS_SIM_DEFAULT_RUNTIME` | Runtime fragment such as `iOS-27`; empty matches any. A **preference, not a requirement**: a stale value widens the pool instead of erroring. |
+| Simulator and device | `defaultDevice` | dropdown (this machine's simulators) | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | The simulator the tools use when a call names no `udid`/`device`, picked from the simulators this machine has; a value that is no longer installed is marked and falls back to the first available iPhone. |
+| | `defaultRuntime` | dropdown (this machine's runtimes) | empty | `IOS_SIM_DEFAULT_RUNTIME` | The installed runtime the tools prefer, picked from the runtimes this machine has; the first entry matches any runtime. A **preference, not a requirement**: a stale value widens the pool instead of erroring. |
 | | `autoBootSimulator` | switch | on | `IOS_SIM_AUTO_BOOT` | When off, tools fail instead of running `simctl boot` for a stopped target. |
 | | `autoOpenSimulator` | switch | on | `IOS_SIM_AUTO_OPEN` | Matches the original by opening the Simulator window (boot / show / open URL / build and run); off keeps everything headless. |
 | | `bootTimeoutSeconds` | integer | `120` | `IOS_SIM_BOOT_TIMEOUT_MS` (ms) | Longest wait for one `simctl boot` / `bootstatus`, in seconds. The legacy variable keeps its millisecond spelling and is converted. |
@@ -126,7 +126,7 @@ Below the form sit the host check and two buttons:
 
 - **Host system** — decided twice: synchronously from the browser's own platform string (so a non-macOS browser sees the notice on first paint, before any request), then authoritatively from the host half's `GET /api/ios-simulator-helper/host`; the host wins on a conflict. When the host is unsupported — or the host never answered and the browser itself is non-macOS — a red notice titled **"This plugin only supports macOS"** appears above the form and names the detected platform.
 - **Run diagnostic** → `GET /api/ios-simulator-helper/status`, the same checks `ios_preflight` runs, listed one by one with status, detail and fix.
-- **Refresh simulators and runtimes** → `GET /api/ios-simulator-helper/inventory`, which discovers the Xcode path and version, the macOS version, simulators, runtimes and the resolved default target, to fill the fields' suggestion lists.
+- **Refresh simulators and runtimes** → `GET /api/ios-simulator-helper/inventory`, which discovers the Xcode path and version, the macOS version, simulators, runtimes and the resolved default target. The page reads it when it opens, because the device and runtime pickers are dropdowns over what this machine has; the button runs the same read again.
 
 ### Legacy configuration
 

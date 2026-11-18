@@ -37,6 +37,7 @@ const report = {
   fieldLabels: [],
   injectKeys: [],
   hostApi: {},
+  discoveryApi: {},
   dictionaryKeys: { en: [], zh: [] },
   usedKeys: [],
 }
@@ -283,6 +284,50 @@ try {
   }
 } catch (error) {
   report.failures.push(`HOST_API threw: ${error.message}`)
+}
+
+// ── the discovery dropdowns' option builders, independent of the render ─────
+// A server render never fetches the inventory, so the option lists a
+// discovery dropdown offers are asserted through the builders themselves.
+try {
+  const api = exported.DISCOVERY_API
+  report.discoveryApi = {
+    devices: api.deviceOptions([
+      { name: 'iPhone 18 Pro', state: 'Shutdown', available: true },
+      { name: 'iPhone 17e', state: 'Shutdown', available: true },
+      { name: 'iPhone 18 Pro', state: 'Booted', available: true },
+      { name: 'Broken Device', state: 'Shutdown', available: false },
+    ]),
+    runtimes: api.runtimeOptions([
+      { name: 'iOS 27.1', identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-1', available: true },
+      { name: 'iOS 27.0', identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-0', available: true },
+      { name: 'iOS 27.10', identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-10', available: true },
+      { name: 'iOS 18.0', identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-18-0', available: false },
+    ]),
+    fragment: api.runtimeFragment('com.apple.CoreSimulator.SimRuntime.iOS-27-1'),
+    // The wiring the page itself uses: one inventory answer in, one option list
+    // per discovery source out. A server render never fetches the inventory, so
+    // this is what proves the dropdowns are fed by the route rather than by a
+    // list written into the bundle.
+    suggestions: api.buildSuggestions({
+      simulators: [
+        { name: 'iPhone 18 Pro', state: 'Shutdown', available: true },
+        { name: 'Gone Device', state: 'Shutdown', available: false },
+      ],
+      runtimes: [
+        { name: 'iOS 27.1', identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-1', available: true },
+      ],
+    }),
+    suggestionsEmpty: api.buildSuggestions(undefined),
+    keepsStoredValue: api.discoveryOptions('iPhone 99', [
+      { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
+    ]),
+    emptyValue: api.discoveryOptions('', [
+      { value: 'iOS-27-1', label: 'iOS 27.1', found: true },
+    ]),
+  }
+} catch (error) {
+  report.failures.push(`DISCOVERY_API threw: ${error.message}`)
 }
 
 // A host that does not serve the namespace must render no trace of the form.

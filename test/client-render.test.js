@@ -135,6 +135,81 @@ test('the backend select shows translated text while storing the raw value', () 
   assert.match(markup, /<option value="idb">Require idb<\/option>/)
 })
 
+test('the device and the runtime are picked from a dropdown, not typed', () => {
+  // Both settings name something this machine has to have, so the control is a
+  // dropdown over what the inventory found and not a text box: a value the user
+  // typed could name a device that was never installed.
+  const blocks = report.variants.macos.split('class="ismh_field"').slice(1)
+  const device = blocks.find((block) => block.includes('>Default device<'))
+  const runtime = blocks.find((block) => block.includes('>Default runtime<'))
+  assert.ok(device, 'the default device field must be rendered')
+  assert.ok(runtime, 'the default runtime field must be rendered')
+  for (const block of [device, runtime]) {
+    assert.match(block, /<select/, 'the picker must be a dropdown')
+    assert.ok(!/<input[^>]*type="text"/.test(block), 'the picker must not accept a typed value')
+  }
+})
+
+test('the dropdown arrow is the stroked chevron, not a CSS triangle', () => {
+  // One inline SVG path in one place, so every dropdown draws the same 1px-line
+  // icon the theme uses everywhere else.
+  const markup = report.variants.macos
+  assert.match(markup, /<svg class="ismh_chevron"[^>]*><path d="M4 6l4 4 4-4"><\/path><\/svg>/)
+  assert.ok(!markup.includes('ismh_selectWrap::after'), 'the CSS triangle must be gone')
+})
+
+test('the discovery dropdowns offer the devices and runtimes this machine has', () => {
+  const api = report.discoveryApi
+  // A device is shown under its own name and stored under it, because the
+  // setting stores a device-name fragment. An unavailable device is left out:
+  // simctl marks a device whose runtime is missing, and offering one would
+  // store a name no call could resolve.
+  assert.deepEqual(api.devices, [
+    { value: 'iPhone 17e', label: 'iPhone 17e', found: true },
+    { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
+  ])
+  // A runtime is shown under its display name but stored under the fragment the
+  // simulator picker matches a device on: 'iOS 27.1' is not a substring of
+  // 'com.apple.CoreSimulator.SimRuntime.iOS-27-1', so storing the display name
+  // would leave the setting pointing at no runtime at all.
+  assert.deepEqual(api.runtimes.map((option) => [option.value, option.label]), [
+    ['iOS-27-1', 'iOS 27.1'],
+    ['iOS-27-0', 'iOS 27.0'],
+    ['iOS-27-10', 'iOS 27.10'],
+  ])
+  assert.equal(api.fragment, 'iOS-27-1')
+})
+
+test('the dropdowns are fed by the inventory route, one list per source', () => {
+  // The page builds its option lists from the inventory answer, and each field
+  // names the list it reads. This is the wiring a server render cannot show,
+  // because the fetch happens in an effect.
+  const built = report.discoveryApi.suggestions
+  assert.deepEqual(Object.keys(built).sort(), ['devices', 'runtimes'])
+  assert.deepEqual(built.devices, [{ value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true }])
+  assert.deepEqual(built.runtimes, [{ value: 'iOS-27-1', label: 'iOS 27.1', found: true }])
+  // Before the inventory answers, every list is empty rather than undefined: a
+  // field whose list is missing would render an empty dropdown either way, and
+  // the gate is what refuses a name the page does not build.
+  assert.deepEqual(report.discoveryApi.suggestionsEmpty, { devices: [], runtimes: [] })
+})
+
+test('a value this machine no longer has stays visible, and an unset value has an entry', () => {
+  // A profile written by hand, or one that names a device that has since been
+  // deleted, must stay visible so the user can see it and fix it — a select
+  // whose value matches no option renders as nothing selected.
+  assert.deepEqual(report.discoveryApi.keepsStoredValue, [
+    { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
+    { value: 'iPhone 99', label: 'iPhone 99', found: false },
+  ])
+  // An unset value needs an entry of its own, or the control would render with
+  // nothing selected and the reader could not tell it from a broken control.
+  assert.deepEqual(report.discoveryApi.emptyValue, [
+    { value: '', label: '', found: true },
+    { value: 'iOS-27-1', label: 'iOS 27.1', found: true },
+  ])
+})
+
 test('every field is a stacked label/control/hint block', () => {
   const blocks = report.variants.macos.split('class="ismh_field"').slice(1)
   assert.equal(blocks.length, 18, 'one block per field')

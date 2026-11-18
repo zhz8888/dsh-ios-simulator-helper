@@ -37,6 +37,25 @@ test('the field table is 18 fields in 6 groups', () => {
   )
 })
 
+test('the device and the runtime are discovery fields, not free text', () => {
+  // Both settings name something this machine has to have, so the page offers
+  // them a dropdown over what the host discovered. The two halves have to name
+  // the same discovery list, which is what the consistency gate compares.
+  assert.equal(FIELDS.get('defaultDevice').kind, 'discovery')
+  assert.equal(FIELDS.get('defaultDevice').suggest, 'devices')
+  assert.equal(FIELDS.get('defaultRuntime').kind, 'discovery')
+  assert.equal(FIELDS.get('defaultRuntime').suggest, 'runtimes')
+  // A dropdown has no placeholder, so the two fields must not carry one: the
+  // copy the page shows for an unset value is the dropdown's own entry.
+  assert.equal(FIELDS.get('defaultDevice').placeholder, undefined)
+  assert.equal(FIELDS.get('defaultRuntime').placeholder, undefined)
+  // The value stays an ordinary string: the set of names this machine has is
+  // discovered at run time, and a schema that policed it would have to spawn
+  // simctl on every write.
+  assert.equal(FIELDS.get('defaultDevice').default, 'iPhone 16')
+  assert.equal(FIELDS.get('defaultRuntime').default, '')
+})
+
 test('every declared field is a volatile node in the Config schema', () => {
   const json = Config.toJSON()
   const root = json.refs[json.uid]
@@ -247,4 +266,5 @@ test('the default device fragment never returns an empty string', () => {
   assert.equal(defaultDeviceFragment({ defaultDevice: 'iPad mini' }), 'iPad mini')
   assert.equal(defaultDeviceFragment(undefined), 'iPhone 16')
 })
+
 

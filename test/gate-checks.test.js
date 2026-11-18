@@ -122,7 +122,42 @@ test('a field whose kind or bounds differ from the host is reported', async () =
     field.key === 'defaultDevice' ? { ...field, kind: 'number' } : field,
   )
   ctx.exported = { ...ctx.exported, FIELD_META: fields }
-  assert.match(gate.checkFieldTable(ctx).join('\n'), /host kind text != client kind number/)
+  assert.match(gate.checkFieldTable(ctx).join('\n'), /host kind discovery != client kind number/)
+})
+
+test('a discovery field whose list differs from the host is reported', async () => {
+  const ctx = await context()
+  // The two halves must name the same discovery list: a field that read the
+  // devices on one side and the runtimes on the other would offer the wrong
+  // options without anything failing.
+  const fields = ctx.exported.FIELD_META.map((field) =>
+    field.key === 'defaultDevice' ? { ...field, suggest: 'runtimes' } : field,
+  )
+  ctx.exported = { ...ctx.exported, FIELD_META: fields }
+  assert.match(gate.checkFieldTable(ctx).join('\n'), /host suggest "devices" != client suggest "runtimes"/)
+})
+
+test('a discovery field naming a list the page does not build is reported', async () => {
+  const ctx = await context()
+  // A mistyped source name yields an empty list and empties the dropdown
+  // silently: the field still renders, so nothing else would notice.
+  const fields = ctx.exported.FIELD_META.map((field) =>
+    field.key === 'defaultDevice' ? { ...field, suggest: 'devicez' } : field,
+  )
+  ctx.exported = { ...ctx.exported, FIELD_META: fields }
+  assert.match(
+    gate.checkDiscoverySources(ctx).join('\n'),
+    /reads the discovery list "devicez", which the page does not build/,
+  )
+})
+
+test('a discovery field that names no list at all is reported', async () => {
+  const ctx = await context()
+  const fields = ctx.exported.FIELD_META.map((field) =>
+    field.key === 'defaultRuntime' ? { ...field, suggest: undefined } : field,
+  )
+  ctx.exported = { ...ctx.exported, FIELD_META: fields }
+  assert.match(gate.checkDiscoverySources(ctx).join('\n'), /names no suggest source/)
 })
 
 test('a group that holds different fields is reported', async () => {

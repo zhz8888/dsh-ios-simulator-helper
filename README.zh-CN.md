@@ -103,8 +103,8 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 | 分组 | 设置项 | 类型 | 默认值 | 原插件环境变量回落 | 说明 |
 |---|---|---|---|---|---|
-| 模拟器与设备 | `defaultDevice` | 文本（建议来自本机模拟器） | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | 设备名片段；工具未指定 `udid`/`device` 时优先使用，找不到时退回第一个可用 iPhone |
-| | `defaultRuntime` | 文本（建议来自已装运行时） | 空 | `IOS_SIM_DEFAULT_RUNTIME` | 运行时名片段，例如 `iOS-27`；留空不限运行时。**偏好而非要求**：值过期时自动放宽而不是报错 |
+| 模拟器与设备 | `defaultDevice` | 下拉（本机已有模拟器） | `iPhone 16` | `IOS_SIM_DEFAULT_DEVICE` | 工具未指定 `udid`/`device` 时使用的模拟器，从本机已有设备中选择；本机已不存在的值会标注出来，并退回第一个可用 iPhone |
+| | `defaultRuntime` | 下拉（本机已装运行时） | 空 | `IOS_SIM_DEFAULT_RUNTIME` | 工具未指定运行时时优先使用的已装运行时，从本机已有运行时中选择；第一项不限运行时。**偏好而非要求**：值过期时自动放宽而不是报错 |
 | | `autoBootSimulator` | 开关 | 开 | `IOS_SIM_AUTO_BOOT` | 关闭后，目标未启动时直接报错，不替你执行 `simctl boot` |
 | | `autoOpenSimulator` | 开关 | 开 | `IOS_SIM_AUTO_OPEN` | 与原插件一致地打开模拟器窗口（启动/显示/打开 URL/构建并运行）；关闭后只做 `simctl` 操作 |
 | | `bootTimeoutSeconds` | 整数 | `120` | `IOS_SIM_BOOT_TIMEOUT_MS`（毫秒） | 单条 `simctl boot` / `bootstatus` 的最长等待，单位为秒；旧变量保留毫秒写法并自动换算 |
@@ -126,7 +126,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 - **宿主系统**：页面先用浏览器自身的平台串**同步**判断（因此非 macOS 的浏览器在首屏就能看到提示，不必等请求），再用 host 半侧 `GET /api/ios-simulator-helper/host` 的结论确认；两者冲突时以 host 为准。判定为不支持时——或 host 没有返回、而浏览器自身就是非 macOS 时——页面顶部出现红色提示条：**该插件仅支持 macOS**，并给出检测到的平台名。
 - **检测环境** → `GET /api/ios-simulator-helper/status`，返回与 `ios_preflight` 相同的检查项，逐条显示状态、详情与修复建议。
-- **刷新模拟器与运行时** → `GET /api/ios-simulator-helper/inventory`，探测 Xcode 路径与版本、macOS 版本、模拟器、运行时与默认目标，用于填充上方字段的建议列表。
+- **刷新模拟器与运行时** → `GET /api/ios-simulator-helper/inventory`，探测 Xcode 路径与版本、macOS 版本、模拟器、运行时与默认目标。页面打开时就会读取一次——设备与运行时两个下拉框列的就是本机已有的条目——该按钮则是重新再读一次。
 
 ### 兼容旧配置
 

@@ -315,6 +315,50 @@ export function checkFieldTable(context) {
         )
       }
     }
+    // A discovery field's options come from the list its `suggest` names, so
+    // the two halves have to name the same list: a field that read the devices
+    // on one side and the runtimes on the other would offer the wrong options
+    // without anything failing.
+    if ((host.suggest ?? undefined) !== (field.suggest ?? undefined)) {
+      problems.push(
+        `field "${field.key}": host suggest ${JSON.stringify(host.suggest ?? null)}`
+          + ` != client suggest ${JSON.stringify(field.suggest ?? null)}`,
+      )
+    }
+  }
+  return problems
+}
+
+/**
+ * Every discovery field must name a list the page actually builds.
+ *
+ * A `discovery` field's options come from the inventory route, and the page
+ * builds one list per source in `buildSuggestions`. A `suggest` name the page
+ * does not provide yields `undefined`, which becomes an empty list and empties
+ * the dropdown silently — the field still renders, so nothing else notices.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkDiscoverySources(context) {
+  const problems = []
+  const sources = context.exported.DISCOVERY_SOURCES
+  if (!Array.isArray(sources)) {
+    problems.push('lib/client.js must export DISCOVERY_SOURCES so the gate can check the discovery lists')
+    return problems
+  }
+  for (const field of context.exported.FIELD_META ?? []) {
+    if (field.kind !== 'discovery') continue
+    if (typeof field.suggest !== 'string' || field.suggest.length === 0) {
+      problems.push(`field "${field.key}" is a discovery field but names no suggest source`)
+      continue
+    }
+    if (!sources.includes(field.suggest)) {
+      problems.push(
+        `field "${field.key}" reads the discovery list "${field.suggest}", which the page does not build`
+          + ` (it builds: ${sources.join(', ')})`,
+      )
+    }
   }
   return problems
 }
@@ -583,6 +627,7 @@ export const CHECKS = Object.freeze([
   { name: 'the Settings section is gated by the page\'s own switch', run: checkSettingsSection },
   { name: 'the two field tables agree', run: checkFieldTable },
   { name: 'the two group tables agree', run: checkGroupTable },
+  { name: 'every discovery field names a list the page builds', run: checkDiscoverySources },
   { name: 'the three routes agree', run: checkRoutes },
   { name: 'every key the page looks up is in both locale files', run: checkDictionaryCoverage },
   { name: 'the two locale files declare the same keys', run: checkDictionarySymmetry },

@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import process from 'node:process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
-import { FIELD_GROUPS, FIELD_KEYS, FIELDS, SETTINGS_NAMESPACE } from '../lib/settings.js'
-import * as hostIndex from '../lib/index.js'
+import { fileURLToPath } from 'node:url'
 import { ROOT, STATIC_MODULES, loadBundle, stripComments } from '../test/helpers/load-bundle.mjs'
 
 /**
@@ -15,169 +14,280 @@ import { ROOT, STATIC_MODULES, loadBundle, stripComments } from '../test/helpers
  * is the check that keeps the two copies identical, plus the structural checks
  * a host-side test cannot make about a file the browser evaluates on its own.
  *
+ * Every check is a named function that returns the problems it found, so the
+ * test suite can call the SHIPPED gate on a crafted drift and assert that the
+ * drift is reported. A copy of a check in the test suite would keep passing
+ * after the check itself stopped checking.
+ *
  * Run with `pnpm run check`.
  */
 
-const failures = []
+/**
+ * Everything the checks read.
+ *
+ * @typedef {object} GateContext
+ * @property {string} clientSource - the browser half's source.
+ * @property {string} clientCode - that source without its comments.
+ * @property {string} hostSource - the host half's source.
+ * @property {string} patch - the Cordis patch file.
+ * @property {Record<string, unknown>} manifest - the package manifest.
+ * @property {{id: string, factory: Function}} registration - the bundle's registration.
+ * @property {Record<string, unknown>} exported - what the bundle exports.
+ * @property {string[]} required - the modules the bundle asked for.
+ * @property {Record<string, string>} localeEn - the English dictionary.
+ * @property {Record<string, string>} localeZh - the Chinese dictionary.
+ * @property {object} host - the host half's own tables.
+ */
 
-/** Record one failed invariant. */
-function fail(message) {
-  failures.push(message)
-}
+/**
+ * The host half's own tables, read through the module the gate imports.
+ *
+ * @typedef {object} HostTables
+ * @property {string} namespace - the settings namespace.
+ * @property {string[]} fieldKeys - the field keys, in declaration order.
+ * @property {Map<string, object>} fields - the field descriptors, by key.
+ * @property {object[]} groups - the group descriptors, in page order.
+ * @property {string} localeGlobal - the name the copy is published under.
+ */
 
-// The externals and the classic-script rule are checked from the source text,
-// before the bundle is evaluated: the loader's own assertion fires first and
-// would report an undeclared module as a raw stack trace instead of a curated
-// problem, and the loader evaluates a classic script with `new Function(...)`,
-// which rejects a top-level `import` or `export` with a SyntaxError. A
-// failure here stops the run, because the loader cannot even evaluate the
-// bundle once an undeclared module is in it.
-const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
-const declaredExternals = new Set(
-  [...clientSource.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)].map((match) => match[1]),
-)
-for (const specifier of declaredExternals) {
-  if (!STATIC_MODULES.includes(specifier)) {
-    fail(
-      `the client bundle requires "${specifier}", which is not a shell static module`
-        + " (add it to dsh.client.external and to the loader's static module table)",
-    )
+/**
+ * Read one locale file's `settings` dictionary.
+ *
+ * @param {string} language - the language id, which is also the file name.
+ * @param {string[]} problems - the problems found so far; a missing object joins them.
+ * @returns {Record<string, string>} the dictionary, or an empty one.
+ */
+function readDictionary(language, problems) {
+  const file = path.join(ROOT, 'locale', `${language}.json`)
+  const parsed = JSON.parse(readFileSync(file, 'utf8'))
+  const settings = parsed?.settings
+  if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+    problems.push(`locale/${language}.json must declare a "settings" object`)
+    return {}
   }
+  return settings
 }
-if (/^\s*(import|export)\s/m.test(clientSource)) {
-  fail('the client bundle must be a classic script: no import/export statements')
-}
-// The source checks below read the bundle's CODE, not its prose: a JSDoc
-// type reference names a module the same way a runtime import would, and it is
-// not one.
-const clientCode = stripComments(clientSource)
-// A classic script evaluated through `new Function` can still call the dynamic
-// `import()` form, and that would load a module outside the shell's static
-// table without any `require` the load contract sees.
-if (/\bimport\s*\(/.test(clientCode) || /\bimport\s*\.\s*meta/.test(clientCode)) {
-  fail('the client bundle must not use dynamic import() or import.meta')
-}
-if (failures.length > 0) {
-  console.error(`check-bundle: ${failures.length} problem(s)\n`)
-  for (const message of failures) console.error(`  - ${message}`)
-  process.exit(1)
-}
+// --- the checks ------------------------------------------------------------
 
-const { registration, exported, required } = loadBundle()
-
-// --- bundle identity -------------------------------------------------------
-const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
-if (registration.id !== manifest.name) {
-  fail(`bundle id ${JSON.stringify(registration.id)} must equal the package name ${JSON.stringify(manifest.name)}`)
-}
-if (!Array.isArray(exported.inject) || exported.inject.length === 0) {
-  fail('the client bundle must export a non-empty inject list')
-}
-for (const name of ['apply', 'inject', 'NS', 'FIELD_META', 'HOST_API', 'PLUGIN_SURFACE']) {
-  if (exported[name] === undefined) fail(`the client bundle must export ${name}`)
-}
-
-// --- namespace agreement ---------------------------------------------------
-if (exported.NS !== SETTINGS_NAMESPACE) {
-  fail(`client namespace ${JSON.stringify(exported.NS)} must equal SETTINGS_NAMESPACE ${JSON.stringify(SETTINGS_NAMESPACE)}`)
-}
-const patch = readFileSync(path.join(ROOT, 'cordis.patch.yml'), 'utf8')
-if (!patch.includes(`id: ${SETTINGS_NAMESPACE}`)) {
-  fail(`cordis.patch.yml must mount a row whose id is ${SETTINGS_NAMESPACE}`)
-}
-
-// --- plugin surface agreement ---------------------------------------------
-// The form is not a Settings dialog section any more: it is a bundle's own
-// configuration on the Plugins page, in the `plugins.bundle.config` keyed slot.
-// That slot is keyed by the BUNDLE's package name — the value the plugin
-// manager's inventory compares against — so the key is the package name and
-// never the settings namespace above. The namespace stays load-bearing as the
-// patch row id whose live form the page binds to.
-const surface = exported.PLUGIN_SURFACE
-if (surface === undefined) {
-  fail('the client bundle must export PLUGIN_SURFACE')
-} else {
-  if (surface.slot !== 'plugins.bundle.config') {
-    fail(`the form must register into plugins.bundle.config, not ${JSON.stringify(surface.slot)}`)
-  }
-  if (surface.key !== manifest.name) {
-    fail(
-      `the plugins.bundle.config key ${JSON.stringify(surface.key)} must equal the package name ${JSON.stringify(manifest.name)}`,
-    )
-  }
-}
-const packageNameConstant = /const PACKAGE_NAME = "([^"]+)"/.exec(clientSource)
-if (packageNameConstant === null) {
-  fail('lib/client.js must declare PACKAGE_NAME for the plugins.bundle.config key')
-} else if (packageNameConstant[1] !== manifest.name) {
-  fail(`lib/client.js PACKAGE_NAME ${JSON.stringify(packageNameConstant[1])} must equal the package name ${JSON.stringify(manifest.name)}`)
-}
-if (!clientSource.includes('name: "plugins.bundle.config"')) {
-  fail('lib/client.js must register into plugins.bundle.config')
-}
-if (clientSource.includes('"settings.section"')) {
-  fail('lib/client.js must not register into the Settings dialog: plugin pages live on the Plugins page')
-}
-
-// --- field table agreement -------------------------------------------------
-const clientFields = exported.FIELD_META ?? []
-if (clientFields.length !== FIELD_KEYS.length) {
-  fail(`client declares ${clientFields.length} fields but the host schema declares ${FIELD_KEYS.length}`)
-}
-const hostOrder = [...FIELDS.keys()]
-const clientOrder = clientFields.map((field) => field.key)
-if (hostOrder.join(',') !== clientOrder.join(',')) {
-  fail(`field order differs:\n  host:   ${hostOrder.join(', ')}\n  client: ${clientOrder.join(', ')}`)
-}
-for (const field of clientFields) {
-  const host = FIELDS.get(field.key)
-  if (host === undefined) {
-    fail(`client declares unknown field "${field.key}"`)
-    continue
-  }
-  if (host.kind !== field.kind) {
-    fail(`field "${field.key}": host kind ${host.kind} != client kind ${field.kind}`)
-  }
-  if (host.options !== undefined) {
-    const hostOptions = host.options.join('|')
-    const clientOptions = (field.options ?? []).join('|')
-    if (hostOptions !== clientOptions) {
-      fail(`field "${field.key}": host options [${hostOptions}] != client options [${clientOptions}]`)
-    }
-  }
-  // The copy is not part of the duplicated table any more: it lives in the
-  // locale files, and the checks below compare the page's SHAPE with the
-  // host's. A placeholder is a flag on the client (the text is looked up by
-  // key), so the two agree on whether the field has one, not on what it says.
-  if ((host.placeholder !== undefined) !== (field.placeholder !== undefined)) {
-    fail(
-      `field "${field.key}": host placeholder ${JSON.stringify(host.placeholder ?? null)}`
-        + ` != client placeholder ${JSON.stringify(field.placeholder ?? null)}`,
-    )
-  } else if (field.placeholder !== undefined && field.placeholder !== true) {
-    fail(`field "${field.key}": the client placeholder must be the flag true, not ${JSON.stringify(field.placeholder)}`)
-  }
-  // The browser half refuses to stage a number outside the range the host
-  // declares, so the two ranges are part of the duplicated table too.
-  for (const bound of ['min', 'max']) {
-    if ((host[bound] ?? undefined) !== (field[bound] ?? undefined)) {
-      fail(
-        `field "${field.key}": host ${bound} ${JSON.stringify(host[bound] ?? null)}`
-          + ` != client ${bound} ${JSON.stringify(field[bound] ?? null)}`,
+/**
+ * The modules the bundle names must be in the shell's static table.
+ *
+ * The loader's own assertion fires first and would report an undeclared
+ * module as a raw stack trace instead of a curated problem, so the source is
+ * read before the bundle is evaluated.
+ *
+ * @param {string} source - the browser half's source.
+ * @returns {string[]} the problems found.
+ */
+export function checkDeclaredExternals(source) {
+  const problems = []
+  const declared = new Set(
+    [...source.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)].map((match) => match[1]),
+  )
+  for (const specifier of declared) {
+    if (!STATIC_MODULES.includes(specifier)) {
+      problems.push(
+        `the client bundle requires "${specifier}", which is not a shell static module`
+          + " (add it to dsh.client.external and to the loader's static module table)",
       )
     }
   }
+  return problems
 }
 
-// --- group table agreement --------------------------------------------------
-const clientGroups = exported.GROUP_META ?? []
-if (clientGroups.length !== FIELD_GROUPS.length) {
-  fail(`client declares ${clientGroups.length} groups but the host schema declares ${FIELD_GROUPS.length}`)
-} else {
-  for (const [index, host] of FIELD_GROUPS.entries()) {
+/**
+ * The bundle must be a classic script that loads nothing at run time.
+ *
+ * The source is read without its comments: a JSDoc type reference names a
+ * module the same way a runtime import would, and it is not one.
+ *
+ * @param {string} source - the browser half's source.
+ * @returns {string[]} the problems found.
+ */
+export function checkScriptHygiene(source) {
+  const problems = []
+  if (/^\s*(import|export)\s/m.test(source)) {
+    problems.push('the client bundle must be a classic script: no import/export statements')
+  }
+  const code = stripComments(source)
+  // A classic script evaluated through `new Function` can still call the
+  // dynamic `import()` form, and that would load a module outside the shell's
+  // static table without any `require` the load contract sees.
+  if (/\bimport\s*\(/.test(code) || /\bimport\s*\.\s*meta/.test(code)) {
+    problems.push('the client bundle must not use dynamic import() or import.meta')
+  }
+  return problems
+}
+
+/**
+ * The bundle must identify itself as the package and export what the page needs.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkBundleIdentity(context) {
+  const problems = []
+  const { registration, exported, manifest } = context
+  if (registration.id !== manifest.name) {
+    problems.push(
+      `bundle id ${JSON.stringify(registration.id)} must equal the package name ${JSON.stringify(manifest.name)}`,
+    )
+  }
+  if (!Array.isArray(exported.inject) || exported.inject.length === 0) {
+    problems.push('the client bundle must export a non-empty inject list')
+  }
+  for (const name of ['apply', 'inject', 'NS', 'FIELD_META', 'HOST_API', 'PLUGIN_SURFACE']) {
+    if (exported[name] === undefined) problems.push(`the client bundle must export ${name}`)
+  }
+  return problems
+}
+
+/**
+ * The settings namespace must be the patch row id on both sides.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkNamespace(context) {
+  const problems = []
+  const { exported, patch } = context
+  const namespace = context.host.namespace
+  if (exported.NS !== namespace) {
+    problems.push(
+      `client namespace ${JSON.stringify(exported.NS)} must equal SETTINGS_NAMESPACE ${JSON.stringify(namespace)}`,
+    )
+  }
+  if (!patch.includes(`id: ${namespace}`)) {
+    problems.push(`cordis.patch.yml must mount a row whose id is ${namespace}`)
+  }
+  return problems
+}
+/**
+ * The page must register into the Plugins panel's bundle slot, and nowhere else.
+ *
+ * The form is a bundle's own configuration on the Plugins page, in the
+ * `plugins.bundle.config` keyed slot. That slot is keyed by the BUNDLE's
+ * package name — the value the plugin manager's inventory compares against —
+ * so the key is the package name and never the settings namespace. The
+ * namespace stays load-bearing as the patch row id whose live form the page
+ * binds to.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkPluginSurface(context) {
+  const problems = []
+  const { clientSource, exported, manifest } = context
+  const surface = exported.PLUGIN_SURFACE
+  if (surface === undefined) {
+    problems.push('the client bundle must export PLUGIN_SURFACE')
+    return problems
+  }
+  if (surface.slot !== 'plugins.bundle.config') {
+    problems.push(`the form must register into plugins.bundle.config, not ${JSON.stringify(surface.slot)}`)
+  }
+  if (surface.key !== manifest.name) {
+    problems.push(
+      `the plugins.bundle.config key ${JSON.stringify(surface.key)} must equal the package name ${JSON.stringify(manifest.name)}`,
+    )
+  }
+  const packageNameConstant = /const PACKAGE_NAME = "([^"]+)"/.exec(clientSource)
+  if (packageNameConstant === null) {
+    problems.push('lib/client.js must declare PACKAGE_NAME for the plugins.bundle.config key')
+  } else if (packageNameConstant[1] !== manifest.name) {
+    problems.push(
+      `lib/client.js PACKAGE_NAME ${JSON.stringify(packageNameConstant[1])} must equal the package name ${JSON.stringify(manifest.name)}`,
+    )
+  }
+  if (!clientSource.includes('name: "plugins.bundle.config"')) {
+    problems.push('lib/client.js must register into plugins.bundle.config')
+  }
+  if (clientSource.includes('"settings.section"')) {
+    problems.push('lib/client.js must not register into the Settings dialog: plugin pages live on the Plugins page')
+  }
+  return problems
+}
+
+/**
+ * The two field tables must agree, key by key and in order.
+ *
+ * The copy is not part of the duplicated table any more: it lives in the
+ * locale files, so what is compared here is the page's SHAPE — the control,
+ * its options, its bounds — against the host's.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkFieldTable(context) {
+  const problems = []
+  const clientFields = context.exported.FIELD_META ?? []
+  const fieldKeys = context.host.fieldKeys
+  if (clientFields.length !== fieldKeys.length) {
+    problems.push(`client declares ${clientFields.length} fields but the host schema declares ${fieldKeys.length}`)
+  }
+  const hostOrder = [...context.host.fields.keys()]
+  const clientOrder = clientFields.map((field) => field.key)
+  if (hostOrder.join(',') !== clientOrder.join(',')) {
+    problems.push(`field order differs:\n  host:   ${hostOrder.join(', ')}\n  client: ${clientOrder.join(', ')}`)
+  }
+  for (const field of clientFields) {
+    const host = context.host.fields.get(field.key)
+    if (host === undefined) {
+      problems.push(`client declares unknown field "${field.key}"`)
+      continue
+    }
+    if (host.kind !== field.kind) {
+      problems.push(`field "${field.key}": host kind ${host.kind} != client kind ${field.kind}`)
+    }
+    if (host.options !== undefined) {
+      const hostOptions = host.options.join('|')
+      const clientOptions = (field.options ?? []).join('|')
+      if (hostOptions !== clientOptions) {
+        problems.push(`field "${field.key}": host options [${hostOptions}] != client options [${clientOptions}]`)
+      }
+    }
+    // A placeholder is a flag on the client (the text is looked up by key),
+    // so the two agree on whether the field has one, not on what it says.
+    if ((host.placeholder !== undefined) !== (field.placeholder !== undefined)) {
+      problems.push(
+        `field "${field.key}": host placeholder ${JSON.stringify(host.placeholder ?? null)}`
+          + ` != client placeholder ${JSON.stringify(field.placeholder ?? null)}`,
+      )
+    } else if (field.placeholder !== undefined && field.placeholder !== true) {
+      problems.push(`field "${field.key}": the client placeholder must be the flag true, not ${JSON.stringify(field.placeholder)}`)
+    }
+    // The browser half refuses to stage a number outside the range the host
+    // declares, so the two ranges are part of the duplicated table too.
+    for (const bound of ['min', 'max']) {
+      if ((host[bound] ?? undefined) !== (field[bound] ?? undefined)) {
+        problems.push(
+          `field "${field.key}": host ${bound} ${JSON.stringify(host[bound] ?? null)}`
+            + ` != client ${bound} ${JSON.stringify(field[bound] ?? null)}`,
+        )
+      }
+    }
+  }
+  return problems
+}
+
+/**
+ * The two group tables must agree, and each group must hold the fields it claims.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkGroupTable(context) {
+  const problems = []
+  const clientGroups = context.exported.GROUP_META ?? []
+  const groups = context.host.groups
+  if (clientGroups.length !== groups.length) {
+    problems.push(`client declares ${clientGroups.length} groups but the host schema declares ${groups.length}`)
+    return problems
+  }
+  for (const [index, host] of groups.entries()) {
     const client = clientGroups[index]
     if (client.id !== host.id) {
-      fail(`group ${index}: host id ${host.id} != client id ${client.id}`)
+      problems.push(`group ${index}: host id ${host.id} != client id ${client.id}`)
       continue
     }
     // Which card a field renders on is part of the table, not decoration: the
@@ -185,166 +295,363 @@ if (clientGroups.length !== FIELD_GROUPS.length) {
     // client side alone would leave the two halves describing different
     // layouts. The client publishes each group's field keys for this check.
     const hostFields = host.fields.map((field) => field.key)
-    const clientFields = Array.isArray(client.fields) ? client.fields : []
-    if (hostFields.join(',') !== clientFields.join(',')) {
-      fail(
+    const clientFieldKeys = Array.isArray(client.fields) ? client.fields : []
+    if (hostFields.join(',') !== clientFieldKeys.join(',')) {
+      problems.push(
         `group "${host.id}": host fields [${hostFields.join(', ')}]`
-          + ` != client fields [${clientFields.join(', ')}]`,
+          + ` != client fields [${clientFieldKeys.join(', ')}]`,
       )
     }
-    // The group's title and hint are copy now, so they are not compared here:
-    // the dictionary checks below cover them.
   }
+  return problems
 }
-
-// --- route agreement -------------------------------------------------------
-const hostSource = readFileSync(path.join(ROOT, 'lib', 'index.js'), 'utf8')
-const hostPrefix = /const ROUTE_PREFIX = '([^']+)'/.exec(hostSource)?.[1]
-if (hostPrefix === undefined) {
-  fail('lib/index.js must declare ROUTE_PREFIX')
-} else {
+/**
+ * The three routes must be registered by the host and called by the page.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkRoutes(context) {
+  const problems = []
+  const { clientSource, hostSource } = context
+  const hostPrefix = /const ROUTE_PREFIX = '([^']+)'/.exec(hostSource)?.[1]
+  if (hostPrefix === undefined) {
+    problems.push('lib/index.js must declare ROUTE_PREFIX')
+    return problems
+  }
   for (const route of ['host', 'status', 'inventory']) {
-    if (!clientSource.includes(`"${hostPrefix}/${route}"`)) fail(`the client page does not call the host route ${route}`)
+    if (!clientSource.includes(`"${hostPrefix}/${route}"`)) {
+      problems.push(`the client page does not call the host route ${route}`)
+    }
     // Any helper that registers a route counts: the name of the helper is an
     // implementation detail, and the gate's question is whether the route is
     // registered at all.
     if (!new RegExp(`\\w*[Rr]oute\\('${route}'`).test(hostSource)) {
-      fail(`lib/index.js does not register the ${route} route`)
+      problems.push(`lib/index.js does not register the ${route} route`)
     }
   }
+  return problems
 }
 
-// --- the copy lives in the locale files ------------------------------------
-// Every user-visible string is in `locale/en.json` and `locale/zh.json`. The
-// host half projects them into its field table and the browser half reads the
-// same two dictionaries from the page-initialization global the host
-// injects, so neither half carries a copy of its own. These checks are what
-// keep it that way.
-
-/** The two locale files' `settings` dictionaries. */
-const localeDictionary = (language) => {
-  const file = path.join(ROOT, 'locale', `${language}.json`)
-  const parsed = JSON.parse(readFileSync(file, 'utf8'))
-  const settings = parsed?.settings
-  if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
-    fail(`locale/${language}.json must declare a "settings" object`)
-    return {}
+/**
+ * Every key the page can look up must exist in both locale files.
+ *
+ * The keys are derived: the chrome the client exports, the groups and fields
+ * the host declares, the placeholders the fields carry, and the option labels
+ * the client lists. A key the page looks up but the files do not declare
+ * renders as itself.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkDictionaryCoverage(context) {
+  const problems = []
+  const { exported, localeEn, localeZh } = context
+  const clientFields = exported.FIELD_META ?? []
+  const expected = new Set()
+  for (const key of exported.FIXED_KEYS ?? []) expected.add(key)
+  for (const group of context.host.groups) {
+    expected.add(`group.${group.id}`)
+    expected.add(`group.${group.id}.hint`)
   }
-  return settings
+  for (const field of context.host.fields.values()) {
+    expected.add(`field.${field.key}`)
+    expected.add(`field.${field.key}.hint`)
+    if (field.placeholder !== undefined) expected.add(`field.${field.key}.placeholder`)
+  }
+  for (const field of clientFields) {
+    for (const value of field.optionLabel ?? []) expected.add(`option.${field.key}.${value}`)
+  }
+  for (const key of expected) {
+    if (typeof localeEn[key] !== 'string' || localeEn[key].length === 0) {
+      problems.push(`locale/en.json declares no "${key}"`)
+    }
+    if (typeof localeZh[key] !== 'string' || localeZh[key].length === 0) {
+      problems.push(`locale/zh.json declares no "${key}"`)
+    }
+  }
+  return problems
 }
 
-const localeEn = localeDictionary('en')
-const localeZh = localeDictionary('zh')
+/**
+ * The two locale files must declare the same keys, and no key nothing looks up.
+ *
+ * A key that exists in one file and not the other renders as the key itself in
+ * that language. A key nothing looks up is a key that looks like copy but is
+ * never rendered, so nothing will ever notice it go stale.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkDictionarySymmetry(context) {
+  const problems = []
+  const { localeEn, localeZh } = context
+  const enKeys = Object.keys(localeEn).sort()
+  const zhKeys = Object.keys(localeZh).sort()
+  if (enKeys.join(',') !== zhKeys.join(',')) {
+    const onlyEn = enKeys.filter((key) => !zhKeys.includes(key))
+    const onlyZh = zhKeys.filter((key) => !enKeys.includes(key))
+    problems.push(
+      `the locale files declare different keys`
+        + (onlyEn.length > 0 ? `; only in en: ${onlyEn.join(', ')}` : '')
+        + (onlyZh.length > 0 ? `; only in zh: ${onlyZh.join(', ')}` : ''),
+    )
+  }
+  const expected = new Set()
+  for (const key of context.exported.FIXED_KEYS ?? []) expected.add(key)
+  for (const group of context.host.groups) {
+    expected.add(`group.${group.id}`)
+    expected.add(`group.${group.id}.hint`)
+  }
+  for (const field of context.host.fields.values()) {
+    expected.add(`field.${field.key}`)
+    expected.add(`field.${field.key}.hint`)
+    if (field.placeholder !== undefined) expected.add(`field.${field.key}.placeholder`)
+  }
+  for (const field of context.exported.FIELD_META ?? []) {
+    for (const value of field.optionLabel ?? []) expected.add(`option.${field.key}.${value}`)
+  }
+  for (const key of enKeys) {
+    if (!expected.has(key)) problems.push(`locale/en.json declares "${key}", which no control looks up`)
+  }
+  return problems
+}
 
-// The two files must declare the same keys. A key that exists in one and not
-// in the other renders as the key itself in that language.
-const enKeys = Object.keys(localeEn).sort()
-const zhKeys = Object.keys(localeZh).sort()
-if (enKeys.join(',') !== zhKeys.join(',')) {
-  const onlyEn = enKeys.filter((key) => !zhKeys.includes(key))
-  const onlyZh = zhKeys.filter((key) => !enKeys.includes(key))
-  fail(
-    `the locale files declare different keys`
-      + (onlyEn.length > 0 ? `; only in en: ${onlyEn.join(', ')}` : '')
-      + (onlyZh.length > 0 ? `; only in zh: ${onlyZh.join(', ')}` : ''),
+/**
+ * The browser half must carry no copy of its own.
+ *
+ * A `{zh, en}` literal or a CJK string in the bundle is a second source that
+ * will drift. The bundle's identifiers and keys are ASCII, so any CJK inside
+ * a string literal is copy that escaped the locale files.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkNoInlineCopy(context) {
+  const problems = []
+  const code = context.clientCode
+  if (/\{\s*zh\s*:\s*["'`][^"'`]*["'`]\s*,\s*en\s*:/.test(code)) {
+    problems.push(
+      'lib/client.js must not carry inline copy: a `{zh: …, en: …}` literal belongs in locale/en.json and locale/zh.json',
+    )
+  }
+  const cjk = /["'`][^"'`\n]*[\u4e00-\u9fff][^"'`\n]*["'`]/.exec(code)
+  if (cjk !== null) {
+    problems.push(
+      `lib/client.js must not carry inline copy: the CJK string ${JSON.stringify(cjk[0])} belongs in locale/zh.json`,
+    )
+  }
+  return problems
+}
+
+/**
+ * The two halves must agree on the name the copy is published under.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkLocaleGlobal(context) {
+  const problems = []
+  const global = context.exported.LOCALE_GLOBAL
+  if (global === undefined) {
+    problems.push('lib/client.js must export the name it reads the copy from')
+    return problems
+  }
+  if (global !== context.host.localeGlobal) {
+    problems.push(
+      `the copy global differs: client ${JSON.stringify(global)}`
+        + ` != host ${JSON.stringify(context.host.localeGlobal)}`,
+    )
+  }
+  return problems
+}
+/**
+ * The page must decide the macOS question without a request, and agree with the host.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkMacOsGate(context) {
+  const problems = []
+  const { clientSource, exported } = context
+  if (!/REQUIRED_PLATFORM = "darwin"/.test(clientSource)) {
+    problems.push('the client page must declare the required platform (darwin)')
+  }
+  if (!/hostUnsupportedTitle/.test(clientSource) || !/hostUnsupportedBody/.test(clientSource)) {
+    problems.push('the client page must carry the "only supports macOS" notice keys')
+  }
+  if (!/export function requireMacOS/.test(readFileSync(path.join(ROOT, 'lib', 'providers', 'host.js'), 'utf8'))) {
+    problems.push('the host half must keep the requireMacOS gate')
+  }
+  const hostInfo = exported.HOST_API
+  if (hostInfo?.requiredPlatform !== 'darwin') problems.push('the client host API must pin the required platform')
+  if (hostInfo?.detectClientPlatform({ platform: 'MacIntel' })?.supported !== true) {
+    problems.push('the client host API must treat a Mac user agent as supported')
+  }
+  if (hostInfo?.detectClientPlatform({ platform: 'Linux x86_64' })?.supported !== false) {
+    problems.push('the client host API must treat a Linux user agent as unsupported')
+  }
+  if (hostInfo?.hostVerdict({ platform: 'linux', supported: false }, { supported: true })?.source !== 'host') {
+    problems.push('the host route verdict must win over the browser guess')
+  }
+  return problems
+}
+
+/**
+ * The modules the bundle actually asked for must be in the shell's static table.
+ *
+ * The loader already refuses a module outside the table, so what reaches this
+ * point is the set the bundle really asked for.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkRequiredModules(context) {
+  const problems = []
+  for (const specifier of new Set(context.required)) {
+    if (!STATIC_MODULES.includes(specifier)) {
+      problems.push(`the client bundle requires "${specifier}", which is not a shell static module`)
+    }
+  }
+  return problems
+}
+
+/**
+ * Every check, in the order the gate runs them.
+ *
+ * The two source-only checks come first: the loader cannot evaluate the bundle
+ * once an undeclared module is in it, so a failure there has to stop the run
+ * before the bundle is loaded.
+ *
+ * @type {ReadonlyArray<{name: string, run: (context: GateContext) => string[]}>}
+ */
+export const CHECKS = Object.freeze([
+  { name: 'the bundle declares only shell static modules', run: (context) => checkDeclaredExternals(context.clientSource) },
+  { name: 'the bundle is a classic script that loads nothing at run time', run: (context) => checkScriptHygiene(context.clientSource) },
+  { name: 'the bundle identifies itself as the package', run: checkBundleIdentity },
+  { name: 'the settings namespace is the patch row id', run: checkNamespace },
+  { name: 'the page registers into the Plugins panel', run: checkPluginSurface },
+  { name: 'the two field tables agree', run: checkFieldTable },
+  { name: 'the two group tables agree', run: checkGroupTable },
+  { name: 'the three routes agree', run: checkRoutes },
+  { name: 'every key the page looks up is in both locale files', run: checkDictionaryCoverage },
+  { name: 'the two locale files declare the same keys', run: checkDictionarySymmetry },
+  { name: 'the browser half carries no copy of its own', run: checkNoInlineCopy },
+  { name: 'the two halves agree on the copy global', run: checkLocaleGlobal },
+  { name: 'the macOS gate is intact', run: checkMacOsGate },
+  { name: 'the bundle asks only for shell static modules', run: checkRequiredModules },
+])
+
+/**
+ * The host half's own tables.
+ *
+ * The host half is imported LAZILY, so a locale file it cannot read is a
+ * problem the gate reports rather than an exception that kills it: the host
+ * reads its copy at import time, and a key missing from either locale file
+ * throws there.
+ *
+ * @returns {Promise<HostTables>} the tables.
+ */
+async function loadHostTables() {
+  const settings = await import('../lib/settings.js')
+  const host = await import('../lib/index.js')
+  return {
+    namespace: settings.SETTINGS_NAMESPACE,
+    fieldKeys: settings.FIELD_KEYS,
+    fields: settings.FIELDS,
+    groups: settings.FIELD_GROUPS,
+    localeGlobal: host.LOCALE_GLOBAL,
+  }
+}
+
+/**
+ * Read everything the checks read.
+ *
+ * @returns {GateContext} the context.
+ */
+export async function buildContext() {
+  const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
+  const { registration, exported, required } = loadBundle()
+  const problems = []
+  const localeEn = readDictionary('en', problems)
+  const localeZh = readDictionary('zh', problems)
+  if (problems.length > 0) throw new Error(problems.join('\n'))
+  return {
+    clientSource,
+    clientCode: stripComments(clientSource),
+    hostSource: readFileSync(path.join(ROOT, 'lib', 'index.js'), 'utf8'),
+    patch: readFileSync(path.join(ROOT, 'cordis.patch.yml'), 'utf8'),
+    manifest: JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')),
+    registration,
+    exported,
+    required,
+    localeEn,
+    localeZh,
+    host: await loadHostTables(),
+  }
+}
+
+/**
+ * Run every check and report the ones that failed.
+ *
+ * @returns {number} the number of problems found.
+ */
+export async function main() {
+  const clientSource = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
+  // The source checks run first and alone: the loader cannot evaluate the
+  // bundle once an undeclared module is in it, so a failure there has to stop
+  // the run before the bundle is loaded.
+  const early = [...checkDeclaredExternals(clientSource), ...checkScriptHygiene(clientSource)]
+  if (early.length > 0) {
+    console.error(`check-bundle: ${early.length} problem(s)\n`)
+    for (const message of early) console.error(`  - ${message}`)
+    process.exit(1)
+  }
+  let context
+  try {
+    context = await buildContext()
+  } catch (error) {
+    // The host half reads its copy at import time, so a locale file it cannot
+    // read throws there. That is a problem the gate found, not a crash.
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('check-bundle: 1 problem(s)\n')
+    console.error(`  - the host half could not be loaded: ${message}`)
+    process.exit(1)
+  }
+  const problems = []
+  for (const check of CHECKS) problems.push(...check.run(context))
+  if (problems.length > 0) {
+    console.error(`check-bundle: ${problems.length} problem(s)\n`)
+    for (const message of problems) console.error(`  - ${message}`)
+    process.exit(1)
+  }
+  const fields = context.exported.FIELD_META ?? []
+  console.log(
+    `check-bundle: OK — bundle id, namespace, plugin surface, ${fields.length} fields, ${Object.keys(context.localeEn).length} locale keys, 3 routes, the macOS gate and script hygiene all agree.`,
   )
+  return 0
 }
 
-// Every key the page can look up must exist in both files. The keys are
-// derived: the chrome the client exports, the groups and fields the host
-// declares, the placeholders the fields carry, and the option labels the
-// client lists.
-const expectedKeys = new Set()
-for (const key of exported.FIXED_KEYS ?? []) expectedKeys.add(key)
-for (const group of FIELD_GROUPS) {
-  expectedKeys.add(`group.${group.id}`)
-  expectedKeys.add(`group.${group.id}.hint`)
-}
-for (const field of FIELDS.values()) {
-  expectedKeys.add(`field.${field.key}`)
-  expectedKeys.add(`field.${field.key}.hint`)
-  if (field.placeholder !== undefined) expectedKeys.add(`field.${field.key}.placeholder`)
-}
-for (const field of clientFields) {
-  for (const value of field.optionLabel ?? []) expectedKeys.add(`option.${field.key}.${value}`)
-}
-for (const key of expectedKeys) {
-  if (typeof localeEn[key] !== 'string' || localeEn[key].length === 0) {
-    fail(`locale/en.json declares no "${key}"`)
-  }
-  if (typeof localeZh[key] !== 'string' || localeZh[key].length === 0) {
-    fail(`locale/zh.json declares no "${key}"`)
-  }
-}
-// A key the page never looks up is a key that will drift: it looks like copy
-// but nothing renders it, so nothing will ever notice it go stale.
-for (const key of enKeys) {
-  if (!expectedKeys.has(key)) fail(`locale/en.json declares "${key}", which no control looks up`)
-}
-
-// The browser half must carry no copy of its own: a `{zh, en}` literal or a
-// CJK string in the bundle is a second source that will drift.
-const inlineCopy = /\{\s*zh\s*:\s*["'`][^"'`]*["'`]\s*,\s*en\s*:/.exec(clientCode)
-if (inlineCopy !== null) {
-  fail('lib/client.js must not carry inline copy: a `{zh: …, en: …}` literal belongs in locale/en.json and locale/zh.json')
-}
-const cjk = /["'`][^"'`\n]*[\u4e00-\u9fff][^"'`\n]*["'`]/.exec(clientCode)
-if (cjk !== null) {
-  fail(`lib/client.js must not carry inline copy: the CJK string ${JSON.stringify(cjk[0])} belongs in locale/zh.json`)
-}
-
-// The two halves must agree on the name the copy is published under, or the
-// page renders its keys.
-if (exported.LOCALE_GLOBAL === undefined) {
-  fail('lib/client.js must export the name it reads the copy from')
-} else if (exported.LOCALE_GLOBAL !== hostIndex.LOCALE_GLOBAL) {
-  fail(
-    `the copy global differs: client ${JSON.stringify(exported.LOCALE_GLOBAL)}`
-      + ` != host ${JSON.stringify(hostIndex.LOCALE_GLOBAL)}`,
-  )
-}
-// --- the macOS-only notice -------------------------------------------------
-// The page must decide this without a request (a non-macOS browser must be told
-// immediately), and the host must expose the same verdict for confirmation.
-if (!/REQUIRED_PLATFORM = "darwin"/.test(clientSource)) {
-  fail('the client page must declare the required platform (darwin)')
-}
-if (!/hostUnsupportedTitle/.test(clientSource) || !/hostUnsupportedBody/.test(clientSource)) {
-  fail('the client page must carry the "only supports macOS" notice keys')
-}
-if (!/export function requireMacOS/.test(readFileSync(path.join(ROOT, 'lib', 'providers', 'host.js'), 'utf8'))) {
-  fail('the host half must keep the requireMacOS gate')
-}
-const hostInfo = exported.HOST_API
-if (hostInfo?.requiredPlatform !== 'darwin') fail('the client host API must pin the required platform')
-if (hostInfo?.detectClientPlatform({ platform: 'MacIntel' })?.supported !== true) {
-  fail('the client host API must treat a Mac user agent as supported')
-}
-if (hostInfo?.detectClientPlatform({ platform: 'Linux x86_64' })?.supported !== false) {
-  fail('the client host API must treat a Linux user agent as unsupported')
-}
-if (hostInfo?.hostVerdict({ platform: 'linux', supported: false }, { supported: true })?.source !== 'host') {
-  fail('the host route verdict must win over the browser guess')
-}
-
-// --- client bundle hygiene -------------------------------------------------
-// The loader already refuses a module outside the shell's static table, so
-// what reaches this point is the set the bundle actually asked for. It is
-// compared against the same table rather than a hand-written subset of it: the
-// subset used to be three entries long, and every other shell module the
-// bundle legitimately needs was only a warning.
-for (const specifier of new Set(required)) {
-  if (!STATIC_MODULES.includes(specifier)) {
-    fail(`the client bundle requires "${specifier}", which is not a shell static module`)
+/**
+ * Whether this file is the process's entry point.
+ *
+ * The comparison resolves both sides through `realpathSync`, because a
+ * temporary directory on macOS is a symlink: `os.tmpdir()` answers
+ * `/var/folders/...` while the same path resolved is
+ * `/private/var/folders/...`, and the naive comparison would never match. A
+ * gate that silently did nothing would look exactly like a gate that passed.
+ *
+ * @returns {boolean} whether this file was run rather than imported.
+ */
+export function isEntryPoint() {
+  const entry = process.argv[1]
+  if (entry === undefined) return false
+  const self = fileURLToPath(import.meta.url)
+  try {
+    return realpathSync(self) === realpathSync(entry)
+  } catch {
+    return self === entry
   }
 }
 
-if (failures.length > 0) {
-  console.error(`check-bundle: ${failures.length} problem(s)\n`)
-  for (const message of failures) console.error(`  - ${message}`)
-  process.exit(1)
-}
-
-console.log(
-  `check-bundle: OK — bundle id, namespace, plugin surface, ${clientFields.length} fields, ${expectedKeys.size} locale keys, 3 routes, the macOS gate and script hygiene all agree.`,
-)
+if (isEntryPoint()) await main()

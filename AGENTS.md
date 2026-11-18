@@ -20,7 +20,7 @@ The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `l
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 199 tests over 12 suite files, no Xcode and no simulator needed
+pnpm test                    # 217 tests over 13 suite files, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
 pnpm run typecheck           # tsc --noEmit over both halves — the type gate, no build
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount + typecheck
@@ -64,7 +64,7 @@ lib/tools/index.js    the 21 defineTool definitions, argument/result schemas, im
 lib/providers/        ported providers: build, sim, project, logs, screenshot, ui, preflight, host
 lib/util/             process execution, path handling, content blocks
 skills/ios-dev/       the bundled skill
-scripts/              check-bundle.mjs, verify-mount.mjs, smoke.mjs, link-dsh-deps.mjs, lib/smoke-report.mjs
+scripts/              check-bundle.mjs (named, testable checks), verify-mount.mjs, smoke.mjs, link-dsh-deps.mjs, lib/smoke-report.mjs
 test/                 node:test suites plus render/bundle helpers
 assets/               the four curated marketplace screenshots
 screenshots.json      the market-facing list of those four images (relative paths, validated by test/)
@@ -158,7 +158,7 @@ Five layers, and what each one actually proves:
 |---|---|---|
 | Unit / parsers | `pnpm test` | bundle loading contract and static-module limits, manifest and patch contract, settings projection (volatile reads, env fallbacks, out-of-range fallbacks, boolean spellings), and the ported parsers |
 | Configuration-page render | `pnpm test` (`client-render.test.js`) | the whole form rendered with real React in four host scenarios (macOS, Linux, Windows, undetectable), the `plugins.bundle.config` slot and key pinned, no slot entry when the namespace is not served, every dictionary key resolving, and the "only supports macOS" notice shown exactly on non-macOS |
-| Consistency gate | `pnpm test` (`test/gate.test.js`) and `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the `plugins.bundle.config` key and `PACKAGE_NAME` = package name with no `settings.section` registration, the two field tables agreeing on shape key by key, the two locale files declaring the same keys with every key the page looks up present in both and no key nothing looks up, the browser bundle carrying no copy of its own, the two halves agreeing on the name the copy is published under, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
+| Consistency gate | `pnpm test` (`test/gate.test.js` and `test/gate-checks.test.js`) and `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the `plugins.bundle.config` key and `PACKAGE_NAME` = package name with no `settings.section` registration, the two field tables agreeing on shape key by key, the two locale files declaring the same keys with every key the page looks up present in both and no key nothing looks up, the browser bundle carrying no copy of its own, the two halves agreeing on the name the copy is published under, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script. `test/gate-checks.test.js` calls the gate's own named checks on a crafted drift, so the gate is itself under test |
 | Real host mount | `scripts/verify-mount.mjs` | real Cordis `Context` + real `ToolRuntime`: 21 tools registered, mounting asserted to start no subprocess, `ios_discover_project` dispatched through the registry and schema-validated, malformed arguments and unknown tool names refused, 17 fields volatile, everything unregistered after dispose, and the whole run kept off Apple's tooling (`--with-simulator` adds `ios_preflight` and `ios_list_simulators`) |
 | Type gate | `pnpm run typecheck` | the host half's contracts, checked against the harness' own declarations: the 21 tools' argument and result schemas against `defineTool`'s inference, every provider's result against the schema that declares it, and every `rt.settings` read against the hand-written `Settings` interface — plus the browser half's contracts, checked against the real `react` and the real `dsh-client-ui-primitives` declarations. The two halves are checked apart because they run in different realms |
 

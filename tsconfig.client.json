@@ -1,0 +1,19 @@
+{
+  // The browser half is checked apart from the host half because the two run
+  // in different realms, not because the syntax differs. The host half runs
+  // on Node and is checked with `types: ["node"]`; this half has no Node
+  // globals at all, and its `require` is resolved by the shell's module table
+  // at run time rather than from disk, so the modules it pulls in are
+  // declared in `types/client-globals.d.ts` instead of imported.
+  //
+  // `module` is `Node16` because the package is `"type": "module"`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2023", "DOM"],
+    "types": []
+  },
+  "include": ["lib/client.js", "types/**/*.d.ts"],
+  "exclude": []
+}

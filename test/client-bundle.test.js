@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { ROOT, STATIC_MODULES, loadBundle } from './helpers/load-bundle.mjs'
+import { ROOT, STATIC_MODULES, loadBundle, stripComments } from './helpers/load-bundle.mjs'
 import { FIELD_KEYS, SETTINGS_NAMESPACE } from '../lib/settings.js'
 
 /**
@@ -48,8 +48,12 @@ test('client bundle is a classic script, not an ES module', () => {
   const source = readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
   assert.ok(!/^\s*import\s/m.test(source), 'bundle must not use import statements')
   assert.ok(!/^\s*export\s/m.test(source), 'bundle must not use export statements')
-  assert.ok(!/\bimport\s*\(/.test(source), 'bundle must not use dynamic import()')
-  assert.ok(!/\bimport\s*\.\s*meta/.test(source), 'bundle must not use import.meta')
+  // The rules below are about what the bundle LOADS at run time. A JSDoc type
+  // reference names a module the same way a runtime import would, and it is not
+  // one, so the comments are stripped before the source is read for them.
+  const code = stripComments(source)
+  assert.ok(!/\bimport\s*\(/.test(code), 'bundle must not use dynamic import()')
+  assert.ok(!/\bimport\s*\.\s*meta/.test(code), 'bundle must not use import.meta')
   assert.match(source, /window\.__ModuleLoader__\.load\(\{/)
 })
 

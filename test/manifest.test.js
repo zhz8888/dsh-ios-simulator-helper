@@ -109,6 +109,24 @@ test('pins the DSH releases the host half is built against', () => {
   assert.match(manifest.peerDependencies['@deepseek-ai/schemastery'], /3\.18\.4/)
 })
 
+test('the browser half is checked by the type gate too', () => {
+  // The browser half is a classic script the shell evaluates on its own, so
+  // nothing about it is checked by the host's type gate. A second project
+  // checks it against the same declarations the shell's primitives ship, and
+  // the scripts have to run both: a client that stopped being checked would
+  // still leave the host half green.
+  const scripts = manifest.scripts
+  assert.ok(scripts.typecheck.includes('tsconfig.client.json'), 'typecheck must check the browser half')
+  assert.ok(scripts.check.includes('tsconfig.client.json'), 'check must check the browser half')
+  for (const file of ['tsconfig.client.json', 'types/client-globals.d.ts']) {
+    assert.ok(existsSync(path.join(ROOT, file)), `${file} must exist`)
+  }
+  // The primitives' `latest` dist-tag still points at a release whose
+  // declarations match neither the runtime API nor this plugin, so the
+  // devDependency is pinned exactly.
+  const primitives = manifest.devDependencies['@deepseek-ai/dsh-client-ui-primitives']
+  assert.match(primitives, /^\d+\.\d+\.\d+(-[\w.]+)?$/, 'the primitives must be pinned exactly')
+})
 test('official @deepseek-ai packages are peers, never runtime dependencies', () => {
   // The harness ships these packages, so a `dependencies` entry would make the
   // install resolve a second, unshared copy of a package the host already owns.

@@ -69,8 +69,8 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "node --test test/*.test.js && node scripts/check-bundle.mjs && node scripts/verify-mount.mjs && tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "check": "node --test test/*.test.js && node scripts/check-bundle.mjs && node scripts/verify-mount.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "smoke:simulator": "node scripts/smoke.mjs --with-simulator",
     "verify:mount": "node scripts/verify-mount.mjs",
@@ -84,12 +84,15 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
     "@deepseek-ai/dsh-client-connection": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-store": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.2",
     "@deepseek-ai/dsh-commands": "0.2.1-rc.2",
     "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
     "@deepseek-ai/dsh-settings": "0.2.1-rc.2",
     "@deepseek-ai/dsh-skill": "0.2.1-rc.2",
     "@deepseek-ai/dsh-util-values": "0.2.1-rc.2",
     "@types/node": "22.20.0",
+    "@types/react": "^18.3.31",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "6.0.3"

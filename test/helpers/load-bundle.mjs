@@ -35,6 +35,21 @@ export const STATIC_MODULES = [
   '@deepseek-ai/dsh-client-ui-dockkit',
 ]
 
+/**
+ * The bundle's CODE, without its comments.
+ *
+ * A JSDoc type reference names a module the same way a runtime import would,
+ * and it is not one: the rule the bundle has to keep is about what it LOADS at
+ * run time, not about what its types mention. Stripping the comments first is
+ * what keeps that rule honest instead of merely strict.
+ *
+ * @param {string} source - the bundle's source.
+ * @returns {string} the source without its comments.
+ */
+export function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
+
 /** A permissive stand-in for a required module: used only to execute the factory. */
 export function stubModule(extra = {}) {
   return new Proxy(extra, {

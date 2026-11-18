@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { FIELD_GROUPS, FIELD_KEYS, FIELDS, SETTINGS_NAMESPACE } from '../lib/settings.js'
 import * as hostIndex from '../lib/index.js'
-import { ROOT, STATIC_MODULES, loadBundle } from '../test/helpers/load-bundle.mjs'
+import { ROOT, STATIC_MODULES, loadBundle, stripComments } from '../test/helpers/load-bundle.mjs'
 
 /**
  * Consistency gate for the browser bundle.
@@ -47,10 +47,14 @@ for (const specifier of declaredExternals) {
 if (/^\s*(import|export)\s/m.test(clientSource)) {
   fail('the client bundle must be a classic script: no import/export statements')
 }
+// The source checks below read the bundle's CODE, not its prose: a JSDoc
+// type reference names a module the same way a runtime import would, and it is
+// not one.
+const clientCode = stripComments(clientSource)
 // A classic script evaluated through `new Function` can still call the dynamic
 // `import()` form, and that would load a module outside the shell's static
 // table without any `require` the load contract sees.
-if (/\bimport\s*\(/.test(clientSource) || /\bimport\s*\.\s*meta/.test(clientSource)) {
+if (/\bimport\s*\(/.test(clientCode) || /\bimport\s*\.\s*meta/.test(clientCode)) {
   fail('the client bundle must not use dynamic import() or import.meta')
 }
 if (failures.length > 0) {
@@ -280,11 +284,11 @@ for (const key of enKeys) {
 
 // The browser half must carry no copy of its own: a `{zh, en}` literal or a
 // CJK string in the bundle is a second source that will drift.
-const inlineCopy = /\{\s*zh\s*:\s*["'`][^"'`]*["'`]\s*,\s*en\s*:/.exec(clientSource)
+const inlineCopy = /\{\s*zh\s*:\s*["'`][^"'`]*["'`]\s*,\s*en\s*:/.exec(clientCode)
 if (inlineCopy !== null) {
   fail('lib/client.js must not carry inline copy: a `{zh: …, en: …}` literal belongs in locale/en.json and locale/zh.json')
 }
-const cjk = /["'`][^"'`\n]*[\u4e00-\u9fff][^"'`\n]*["'`]/.exec(clientSource)
+const cjk = /["'`][^"'`\n]*[\u4e00-\u9fff][^"'`\n]*["'`]/.exec(clientCode)
 if (cjk !== null) {
   fail(`lib/client.js must not carry inline copy: the CJK string ${JSON.stringify(cjk[0])} belongs in locale/zh.json`)
 }

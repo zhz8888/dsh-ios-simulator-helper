@@ -84,6 +84,12 @@ export class SettingsFormModel {
     })
     return {
       getSnapshot: () => snapshot,
+      // The real store replaces the state wholesale and notifies; a page that
+      // writes to it directly expects exactly that.
+      set: (next) => {
+        snapshot = next
+        for (const listener of listeners) listener()
+      },
       subscribe: (listener) => {
         listeners.add(listener)
         return () => listeners.delete(listener)

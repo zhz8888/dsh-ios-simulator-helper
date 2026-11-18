@@ -20,9 +20,9 @@ The plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `l
 
 ```bash
 pnpm install                 # test dependencies only (react, react-dom)
-pnpm test                    # 198 tests over 12 suite files, no Xcode and no simulator needed
+pnpm test                    # 199 tests over 12 suite files, no Xcode and no simulator needed
 node --test test/host.test.js  # one suite while iterating
-pnpm run typecheck           # tsc --noEmit over lib/ — the type gate, no build
+pnpm run typecheck           # tsc --noEmit over both halves — the type gate, no build
 pnpm run check               # THE GATE: tests + bundle consistency + real-host mount + typecheck
 pnpm run verify:mount        # real Cordis Context + real ToolRuntime; hermetic unless --with-simulator
 pnpm run smoke               # read-only probes against the real machine
@@ -45,7 +45,9 @@ npm pack --dry-run --cache /tmp/npm-cache --registry https://registry.npmjs.org 
 
 ```
 package.json          version, the dsh manifest (bundle patch + client + compatibility), peer ranges, files whitelist
-tsconfig.json         the type gate: checkJs over lib/, noEmit — there is no build step
+tsconfig.json         the host half's type gate: checkJs over lib/, noEmit — there is no build step
+tsconfig.client.json   the browser half's type gate: the same checker, the shell's realm
+types/                 the browser half's globals: the shell's module loader and its run-time require
 pnpm-workspace.yaml   pnpm 11 settings: pins the development tree's cordis to one instance
 cordis.patch.yml      the one `insert` row that mounts the host half
 ios-simulator.png     plugin icon: the ZCode plugin's artwork at 192 px, its grey backdrop keyed out (test decodes it)
@@ -104,7 +106,7 @@ These are load-bearing. Some fail at the loader, some fail silently in a UI.
 - ESM only, no transpiler, no bundler, no linter, no formatter. Keep to the style of the file you are editing.
 - 2-space indentation in every hand-written module. `lib/client.js` is the exception: its body sits one level inside the module-loader factory and is indented with tabs.
 - Every `lib/` module opens with a JSDoc block explaining why it exists, not what each line does; imports may precede it. All but `lib/util/path.js` and `lib/util/run.js` also carry the `@module @zhz8888/dsh-ios-simulator-helper/<name>` tag, and `lib/index.js` names the package itself with no suffix.
-- **Types are written as JSDoc**, because there is no build step to erase them: `@typedef` for a shape, `@param`/`@returns` for a signature, and `import('<package>').<Type>` for a type that lives in a dependency. A type that names a shape the code does not produce is worse than no type at all, so the code wins: when the two disagree, fix the annotation. A provider's result is described by a `@typedef` other files import by name, so a shape is declared once. The harness' own types are used rather than re-declared — `import('@deepseek-ai/dsh-tools').InferArgs` and `InferValue` infer a tool's argument and result types from its two schemas, and `import('@deepseek-ai/cordis').Context` types the plugin context. `lib/client.js` is not type-checked: it is a classic script, and the consistency gate covers what the checker cannot.
+- **Types are written as JSDoc**, because there is no build step to erase them: `@typedef` for a shape, `@param`/`@returns` for a signature, and `import('<package>').<Type>` for a type that lives in a dependency. A type that names a shape the code does not produce is worse than no type at all, so the code wins: when the two disagree, fix the annotation. A provider's result is described by a `@typedef` other files import by name, so a shape is declared once. The harness' own types are used rather than re-declared — `import('@deepseek-ai/dsh-tools').InferArgs` and `InferValue` infer a tool's argument and result types from its two schemas, and `import('@deepseek-ai/cordis').Context` types the plugin context. `lib/client.js` is type-checked too, by `tsconfig.client.json`: it is a classic script, so it runs in the shell's realm rather than Node's, and the two halves are therefore checked apart — the browser half against `lib: [ES2023, DOM]` and `types: []`, with the shell's globals declared in `types/client-globals.d.ts`.
 - Comment the decisions that are not obvious from the code — why a fallback order is what it is, why a limit exists, what a silent failure would look like. Do not narrate straightforward code.
 
 ## The icon is the upstream artwork with its backdrop keyed out
@@ -158,7 +160,7 @@ Five layers, and what each one actually proves:
 | Configuration-page render | `pnpm test` (`client-render.test.js`) | the whole form rendered with real React in four host scenarios (macOS, Linux, Windows, undetectable), the `plugins.bundle.config` slot and key pinned, no slot entry when the namespace is not served, every dictionary key resolving, and the "only supports macOS" notice shown exactly on non-macOS |
 | Consistency gate | `pnpm test` (`test/gate.test.js`) and `scripts/check-bundle.mjs` | bundle id = package name, namespace = patch row id, the `plugins.bundle.config` key and `PACKAGE_NAME` = package name with no `settings.section` registration, the two field tables agreeing on shape key by key, the two locale files declaring the same keys with every key the page looks up present in both and no key nothing looks up, the browser bundle carrying no copy of its own, the two halves agreeing on the name the copy is published under, the three routes on both sides, the macOS verdict and notice keys still in place, and the bundle still a classic script |
 | Real host mount | `scripts/verify-mount.mjs` | real Cordis `Context` + real `ToolRuntime`: 21 tools registered, mounting asserted to start no subprocess, `ios_discover_project` dispatched through the registry and schema-validated, malformed arguments and unknown tool names refused, 17 fields volatile, everything unregistered after dispose, and the whole run kept off Apple's tooling (`--with-simulator` adds `ios_preflight` and `ios_list_simulators`) |
-| Type gate | `pnpm run typecheck` | the host half's contracts, checked against the harness' own declarations: the 21 tools' argument and result schemas against `defineTool`'s inference, every provider's result against the schema that declares it, and every `rt.settings` read against the hand-written `Settings` interface |
+| Type gate | `pnpm run typecheck` | the host half's contracts, checked against the harness' own declarations: the 21 tools' argument and result schemas against `defineTool`'s inference, every provider's result against the schema that declares it, and every `rt.settings` read against the hand-written `Settings` interface — plus the browser half's contracts, checked against the real `react` and the real `dsh-client-ui-primitives` declarations. The two halves are checked apart because they run in different realms |
 
 `pnpm run smoke` is the read-only half of that: Xcode discovery, actual `simctl` calls, `ios_discover_project`, the configuration page's inventory route and `ios_ui_status`. The write path — scaffold a project, compile it, resolve the built product's bundle id, then install / launch / screenshot / logs / terminate / shutdown — is `pnpm run smoke:simulator`.
 

@@ -165,7 +165,7 @@ check('an unknown tool name does not resolve', unknown.isError === true, unknown
 const schema = plugin.Config.toJSON()
 const root = schema.refs[schema.uid]
 const volatileFields = Object.values(root.dict).filter((ref) => schema.refs[ref].meta.volatile === true)
-check('every settings field is volatile (so the settings form can serve it)', volatileFields.length === 17, volatileFields.length)
+check('every settings field is volatile (so the settings form can serve it)', volatileFields.length === 18, volatileFields.length)
 
 // ── disposal removes the tools again ─────────────────────────────────────────
 await pluginFiber.dispose()

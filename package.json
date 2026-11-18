@@ -34,6 +34,7 @@
       "default": "./lib/client.js"
     },
     "./locale/*.json": "./locale/*.json",
+    "./assets/*": "./lib/assets/*",
     "./package.json": "./package.json"
   },
   "files": [

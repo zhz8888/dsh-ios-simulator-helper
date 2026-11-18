@@ -183,27 +183,76 @@ export function checkPluginSurface(context) {
     problems.push('the client bundle must export PLUGIN_SURFACE')
     return problems
   }
-  if (surface.slot !== 'plugins.bundle.config') {
-    problems.push(`the form must register into plugins.bundle.config, not ${JSON.stringify(surface.slot)}`)
+  // The parameter page is the ROW's own page: the Plugins page renders the
+  // entry through its keyed slot, and the row's Configure control opens it.
+  // The bundle's page keeps its description, its rows and its source.
+  if (surface.slot !== 'plugins.row.config') {
+    problems.push(`the form must register into plugins.row.config, not ${JSON.stringify(surface.slot)}`)
   }
-  if (surface.key !== manifest.name) {
+  const expectedKey = `${manifest.name}#${context.host.namespace}`
+  if (surface.key !== expectedKey) {
     problems.push(
-      `the plugins.bundle.config key ${JSON.stringify(surface.key)} must equal the package name ${JSON.stringify(manifest.name)}`,
+      `the plugins.row.config key ${JSON.stringify(surface.key)} must be ${JSON.stringify(expectedKey)}`,
     )
   }
   const packageNameConstant = /const PACKAGE_NAME = "([^"]+)"/.exec(clientSource)
   if (packageNameConstant === null) {
-    problems.push('lib/client.js must declare PACKAGE_NAME for the plugins.bundle.config key')
+    problems.push('lib/client.js must declare PACKAGE_NAME for the plugins.row.config key')
   } else if (packageNameConstant[1] !== manifest.name) {
     problems.push(
       `lib/client.js PACKAGE_NAME ${JSON.stringify(packageNameConstant[1])} must equal the package name ${JSON.stringify(manifest.name)}`,
     )
   }
-  if (!clientSource.includes('name: "plugins.bundle.config"')) {
-    problems.push('lib/client.js must register into plugins.bundle.config')
+  // The registration takes its name from the constant rather than from a
+  // literal, so what has to be there is the constant itself.
+  if (!/const PLUGIN_SURFACE = Object\.freeze\(\{/.test(clientSource)) {
+    problems.push('lib/client.js must declare the PLUGIN_SURFACE constant')
   }
-  if (clientSource.includes('"settings.section"')) {
-    problems.push('lib/client.js must not register into the Settings dialog: plugin pages live on the Plugins page')
+  return problems
+}
+
+/**
+ * The Settings dialog's section must exist, be gated by the page's own switch,
+ * and take its names from the surface rather than from a literal.
+ *
+ * @param {GateContext} context - what the checks read.
+ * @returns {string[]} the problems found.
+ */
+export function checkSettingsSection(context) {
+  const problems = []
+  const { clientSource, exported, host } = context
+  const surface = exported.SETTINGS_SURFACE
+  if (surface === undefined) {
+    problems.push('the client bundle must export SETTINGS_SURFACE')
+    return problems
+  }
+  if (surface.section !== 'settings.section') {
+    problems.push(`the Settings section must be settings.section, not ${JSON.stringify(surface.section)}`)
+  }
+  if (surface.icon !== 'settings.section.icon') {
+    problems.push(`the Settings icon must be settings.section.icon, not ${JSON.stringify(surface.icon)}`)
+  }
+  if (surface.id !== host.namespace) {
+    problems.push(`the Settings section id must be the settings namespace ${JSON.stringify(host.namespace)}`)
+  }
+  // The switch is what keeps a fresh profile at one configuration page, so it
+  // has to be a setting the host declares.
+  if (!host.fieldKeys.includes(surface.field)) {
+    problems.push(`the host must declare the ${surface.field} setting the Settings section is gated by`)
+  }
+  // The two slot names may only be spelled in the surface constant: a literal
+  // somewhere else is a registration the gate cannot see. The constant is cut
+  // out of the source first, so what is left is everything else.
+  const constant = /const SETTINGS_SURFACE = Object\.freeze\(\{[\s\S]*?\n\t*\}\)/.exec(clientSource)
+  if (constant === null) {
+    problems.push('lib/client.js must declare the SETTINGS_SURFACE constant')
+  } else {
+    const outside = clientSource.replace(constant[0], '')
+    for (const name of ['settings.section', 'settings.section.icon']) {
+      if (outside.includes(name)) {
+        problems.push(`the slot name ${name} may only appear in the SETTINGS_SURFACE constant`)
+      }
+    }
   }
   return problems
 }
@@ -531,6 +580,7 @@ export const CHECKS = Object.freeze([
   { name: 'the bundle identifies itself as the package', run: checkBundleIdentity },
   { name: 'the settings namespace is the patch row id', run: checkNamespace },
   { name: 'the page registers into the Plugins panel', run: checkPluginSurface },
+  { name: 'the Settings section is gated by the page\'s own switch', run: checkSettingsSection },
   { name: 'the two field tables agree', run: checkFieldTable },
   { name: 'the two group tables agree', run: checkGroupTable },
   { name: 'the three routes agree', run: checkRoutes },

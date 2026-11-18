@@ -302,12 +302,12 @@ if (registered.component === undefined) {
 } else {
   const { component, options } = registered
 
-  // The plugin detail page keys a bundle's configuration by the BUNDLE's
-  // package name and draws the title, icon and crumb itself — so the entry
-  // carries neither the settings navigation's label nor its order.
+  // The row's own page keys a row's configuration by the package name and the
+  // row id, and draws the title, icon and crumb itself — so the entry carries
+  // neither the settings navigation's label nor its order.
   for (const [key, expected] of [
-    ['name', 'plugins.bundle.config'],
-    ['key', '@zhz8888/dsh-ios-simulator-helper'],
+    ['name', 'plugins.row.config'],
+    ['key', '@zhz8888/dsh-ios-simulator-helper#ios-simulator-helper'],
     ['locale', 'settings.iosSimulatorHelper'],
   ]) {
     if (options[key] !== expected) {

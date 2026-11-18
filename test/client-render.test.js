@@ -44,16 +44,15 @@ test('the configuration form renders without throwing on every host', () => {
   }
 })
 
-test('the form registers into the plugin detail page, not the Settings page', () => {
-  // A plugin's own configuration belongs on the Plugins page: the
-  // `plugins.bundle.config` slot is keyed by the BUNDLE's package name, and the
-  // page renders the entry inside the plugin detail. `settings.section` still
-  // renders, but registering there as well would give the plugin two
-  // configuration pages — this form must name exactly one slot.
-  assert.equal(report.registered.slot, 'plugins.bundle.config')
-  assert.equal(report.registered.key, '@zhz8888/dsh-ios-simulator-helper')
+test('the form registers into the plugin row\'s own page', () => {
+  // The parameter page is the ROW's page: the `plugins.row.config` slot is
+  // keyed by the package name and the row id, and the Plugins page gives the
+  // row a Configure control that opens it. The bundle's page keeps its
+  // description, its rows and its source.
+  assert.equal(report.registered.slot, 'plugins.row.config')
+  assert.equal(report.registered.key, '@zhz8888/dsh-ios-simulator-helper#ios-simulator-helper')
   assert.equal(report.registered.locale, 'settings.iosSimulatorHelper')
-  assert.deepEqual(report.registered.slots, ['plugins.bundle.config'])
+  assert.deepEqual(report.registered.slots, ['plugins.row.config'])
 })
 
 test('the injected face carries the form actions and the view the page asks for', () => {
@@ -117,10 +116,10 @@ test('the form draws no title of its own; the plugin detail page owns the chrome
 })
 
 test('every category is its own card', () => {
-  // Five field groups plus the diagnostics card: the card outline is what
+  // Six field groups plus the diagnostics card: the card outline is what
   // separates the categories, so each one must keep carrying it.
   const cards = report.variants.macos.match(/class="ismh_group"/g) ?? []
-  assert.equal(cards.length, 6)
+  assert.equal(cards.length, 7)
 })
 
 test('a switch does not repeat its state as on/off text', () => {
@@ -138,7 +137,7 @@ test('the backend select shows translated text while storing the raw value', () 
 
 test('every field is a stacked label/control/hint block', () => {
   const blocks = report.variants.macos.split('class="ismh_field"').slice(1)
-  assert.equal(blocks.length, 17, 'one block per field')
+  assert.equal(blocks.length, 18, 'one block per field')
   for (const block of blocks) {
     const label = block.indexOf('ismh_label')
     const at = [block.indexOf('ismh_control'), block.indexOf('role="switch"')].filter((index) => index >= 0)
@@ -149,9 +148,9 @@ test('every field is a stacked label/control/hint block', () => {
   }
 })
 
-test('all 17 fields are rendered, in the host schema order', () => {
-  assert.equal(report.fieldKeys.length, 17)
-  assert.deepEqual(report.fieldLabels.length, 17)
+test('all 18 fields are rendered, in the host schema order', () => {
+  assert.equal(report.fieldKeys.length, 18)
+  assert.deepEqual(report.fieldLabels.length, 18)
   for (const label of report.fieldLabels) {
     assert.ok(report.variants.macos.includes(label), `missing control label: ${label}`)
   }

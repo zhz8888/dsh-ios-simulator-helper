@@ -96,6 +96,12 @@
     "field.extraBuildArgs.placeholder": "-quiet\nARCHS=arm64\nSWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG",
     "field.derivedDataDir.placeholder": "<数据目录>/DerivedData",
     "field.dataDir.placeholder": "~/.dsh/ios-simulator-helper",
-    "field.screenshotDir.placeholder": "<数据目录>/screenshots"
+    "field.screenshotDir.placeholder": "<数据目录>/screenshots",
+    "group.interface": "页面位置",
+    "group.interface.hint": "参数是否也出现在「设置」对话框中。",
+    "field.showInSettings": "在「设置」中显示",
+    "field.showInSettings.hint": "开启后，同一份表单也会作为一个分区出现在「设置」对话框中。保持关闭则只有一个配置页面，位于插件行上。",
+    "sectionNav": "iOS 模拟器",
+    "rowSummary": "本插件工具的模拟器、构建、日志与输出参数。"
   }
 }

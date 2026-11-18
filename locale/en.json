@@ -96,6 +96,12 @@
     "field.extraBuildArgs.placeholder": "-quiet\nARCHS=arm64\nSWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG",
     "field.derivedDataDir.placeholder": "<data directory>/DerivedData",
     "field.dataDir.placeholder": "~/.dsh/ios-simulator-helper",
-    "field.screenshotDir.placeholder": "<data directory>/screenshots"
+    "field.screenshotDir.placeholder": "<data directory>/screenshots",
+    "group.interface": "Where the page lives",
+    "group.interface.hint": "Whether the parameters also appear in the Settings dialog.",
+    "field.showInSettings": "Show in Settings",
+    "field.showInSettings.hint": "When on, the same form also appears as a section in the Settings dialog. Leave it off to keep one configuration page, on the plugin row.",
+    "sectionNav": "iOS Simulator",
+    "rowSummary": "Simulator, build, log and output parameters for this plugin’s tools."
   }
 }

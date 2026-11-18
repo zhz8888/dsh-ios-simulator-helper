@@ -81,14 +81,29 @@ test('a namespace that is not the patch row id is reported', async () => {
 
 test('a form that registers into the wrong slot is reported', async () => {
   const ctx = await context()
-  ctx.exported = { ...ctx.exported, PLUGIN_SURFACE: { slot: 'settings.section', key: ctx.manifest.name } }
-  assert.match(gate.checkPluginSurface(ctx)[0], /must register into plugins\.bundle\.config/)
+  ctx.exported = { ...ctx.exported, PLUGIN_SURFACE: { slot: 'plugins.bundle.config', key: ctx.manifest.name } }
+  assert.match(gate.checkPluginSurface(ctx)[0], /must register into plugins\.row\.config/)
 })
 
-test('a form that registers into the Settings dialog is reported', async () => {
+test('a row page keyed by anything but the package and the row id is reported', async () => {
+  const ctx = await context()
+  ctx.exported = { ...ctx.exported, PLUGIN_SURFACE: { slot: 'plugins.row.config', key: ctx.manifest.name } }
+  assert.match(gate.checkPluginSurface(ctx).join('\n'), /must be/)
+})
+
+test('a Settings section that is not gated by the page\'s own switch is reported', async () => {
+  const ctx = await context()
+  ctx.exported = {
+    ...ctx.exported,
+    SETTINGS_SURFACE: { ...ctx.exported.SETTINGS_SURFACE, field: 'notASetting' },
+  }
+  assert.match(gate.checkSettingsSection(ctx).join('\n'), /must declare the notASetting setting/)
+})
+
+test('a Settings slot name spelled outside the surface constant is reported', async () => {
   const ctx = await context()
   ctx.clientSource = `${ctx.clientSource}\nctx.slots.register({ name: "settings.section" });`
-  assert.match(gate.checkPluginSurface(ctx).join('\n'), /must not register into the Settings dialog/)
+  assert.match(gate.checkSettingsSection(ctx).join('\n'), /may only appear in the SETTINGS_SURFACE constant/)
 })
 
 test('a field the host does not declare is reported', async () => {

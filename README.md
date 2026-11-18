@@ -10,7 +10,7 @@
 A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a **parameter page on the plugin's own detail page** in the Plugins panel (Plugins → Installed plugins → iOS Simulator Helper) that edits the simulator parameters in-app instead of through environment variables.
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
-- 17 settings fields in 5 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
+- 18 settings fields in 6 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
 - The parameter page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every tool that drives Apple tooling then refuses with a clear message instead of failing with `spawn xcrun ENOENT`, while `ios_preflight` reports the failing host check and `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer.
 - Published as `@zhz8888/dsh-ios-simulator-helper`; the plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/` rather than the raw package name, and both descriptions say the plugin is unofficial and not affiliated with Apple.
 
@@ -93,7 +93,11 @@ Stable releases (`0.2.1`, `0.2.2`, `0.3.0`, `1.0.0`, …) are unaffected and alw
 
 ## Configuration page
 
-The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The form registers with the Plugins page's `plugins.bundle.config` slot, keyed by the package name, so it renders inside the plugin's detail page in the Plugins panel instead of in the Settings dialog; it exists only while the host half serves that namespace. It reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness. The detail page draws the plugin's title, icon and description; the form contributes one line saying when an edit takes effect, one card per category — built from the same field kit as the built-in settings pages (`@deepseek-ai/dsh-client-ui-primitives`) — and the save bar. The three timeouts are entered in whole seconds, while the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
+The settings namespace equals the profile patch row id equals `ios-simulator-helper` (also `dsh.name`). The form registers with the Plugins panel's `plugins.row.config` slot, keyed by the package name and the row id, so it opens on the **plugin row's own page** — the row's **Configure** control leads to it — instead of inside the bundle's detail page; the bundle's page keeps its description, its rows and its source. It exists only while the host half serves that namespace. It reads and writes through `ctx.configForms`, so staged edits, dirty detection, inline validation, optimistic concurrency (revisions) and "overridden / reset to default" all come from the harness. The page draws the plugin's title, icon and crumb; the form contributes one line saying when an edit takes effect, one card per category — built from the same field kit as the built-in settings pages (`@deepseek-ai/dsh-client-ui-primitives`) — and the save bar. The three timeouts are entered in whole seconds, while the legacy `IOS_SIM_*_MS` variables are still read in milliseconds and converted.
+
+
+
+The **Show in Settings** switch in the last card adds the same form to the **Settings dialog** as a section, with its own line-art icon. It is off by default, so a fresh profile keeps one configuration page; turn it on and the section appears and disappears with the switch, without a reload.
 
 Saving happens in a pill that sticks to the bottom of the form: it appears while edits are staged (or a write is in flight, or one failed), names that state next to a status dot, and carries **Discard changes** and **Save** (disabled while a draft is invalid). A draft that merely puts a control back to the value already in effect counts as no edit at all, a confirmation toast reports a write that landed, and leaving the page discards staged edits.
 
@@ -116,6 +120,7 @@ Saving happens in a pill that sticks to the bottom of the form: it appears while
 | | `logLimit` | integer | `20000` | `IOS_SIM_LOG_LIMIT` | Largest rendered log `ios_logs` returns when the call names no limit. |
 | Output directories | `dataDir` | text | empty | `IOS_SIM_PLUGIN_DATA` | Root for screenshots, build logs and DerivedData; empty uses `$DSH_HOME/ios-simulator-helper`, then `~/.dsh/ios-simulator-helper`. |
 | | `screenshotDir` | text | empty | `IOS_SIM_SCREENSHOT_DIR` | Empty uses `<data dir>/screenshots`. |
+| Where the page lives | `showInSettings` | switch | off | — | When on, the same form also appears as a section in the Settings dialog, under its own icon. |
 
 Below the form sit the host check and two buttons:
 
@@ -130,6 +135,8 @@ The original plugin's `userConfig` (`default_device`, `ui_backend`) and its envi
 ## Screenshots
 
 All four are the live page in DSH harness 0.2.1-rc.2, in the order you scroll it — nothing is mocked up. They show the form inside the plugin's own detail view in the Plugins panel, the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the card headings are Chinese while every field name is the same in both languages.
+
+> These shots predate the move to the plugin row's own page: they show the form inside the bundle's detail view, which is where it used to render. The page itself — the cards, the fields and the save bar — is unchanged; only where it opens has moved. They will be re-captured from the row's **Configure** page.
 
 **1. Simulator and device** — the plugin heading and description, then the fields every `ios_*` call reads:
 
@@ -188,7 +195,7 @@ Two behaviours deserve their own note:
 | Aspect | Original (ZCode) | This plugin (DSH) |
 |---|---|---|
 | Tool exposure | stdio MCP server `ios-simulator`; the model sees `mcp__ios_simulator__*` | Native `ctx.tools.register()`; the model sees `ios_*` |
-| User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Configuration page with 17 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
+| User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Configuration page with 18 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
 | Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()` in front of every Apple-tooling call, plus the configuration page's synchronous and authoritative verdicts |
 | Working directory | `process.cwd()` | `exec.agent.session.header.cwd` (the session workspace) |
 | Data directory | `IOS_SIM_PLUGIN_DATA` / temp | `$DSH_HOME/ios-simulator-helper`, configurable on the configuration page |

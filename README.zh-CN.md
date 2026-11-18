@@ -10,7 +10,7 @@
 把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个**参数表单**，渲染在「插件」页该插件的详情页里（插件 → 已安装插件 → iOS 模拟器助手），让默认设备、运行时、UI 后端、构建参数与输出目录在应用里配置，而不是靠环境变量。
 
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
-- 参数页 5 组 17 个字段，全部实时生效；空值按「参数页 → 原插件环境变量 → 内置默认值」顺序回落。
+- 参数页 6 组 18 个字段，全部实时生效；空值按「参数页 → 原插件环境变量 → 内置默认值」顺序回落。
 - 参数页会检测宿主系统：**非 macOS 时直接提示该插件仅支持 macOS**；所有需要调用 Apple 工具链的工具都会以明确的报错拒绝执行，而不是抛出 `spawn xcrun ENOENT`；`ios_preflight` 则报告宿主检查失败，`ios_discover_project`、`ios_create_app` 与 `ios_ui_status` 仍可正常返回。
 - npm 包名为 `@zhz8888/dsh-ios-simulator-helper`；插件页显示的名称由 `locale/` 提供——英文 **iOS Simulator Helper**、中文 **iOS 模拟器助手**——而不是裸包名，两份描述都注明插件为非官方、与 Apple 无隶属关系。
 
@@ -93,7 +93,11 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## 配置页面
 
-配置命名空间 = profile patch 行 id = `ios-simulator-helper`（同时是 `dsh.name`）。表单注册到插件页的 `plugins.bundle.config` 槽、以包名为键，因此渲染在「插件」页该插件的详情页里，而不是「设置」对话框里；只有当 host 半侧提供该命名空间时它才存在。表单通过 `ctx.configForms` 读写，因此暂存编辑、脏值检测、内联校验、乐观并发（revision）与「已覆盖 / 恢复默认」语义都由 harness 提供。详情页负责绘制插件标题、图标与描述；表单本身只贡献一行「改动何时生效」的说明、每个分组一张卡片——卡片描边就是分组之间的分隔，度量取自内置设置页所用的同一套表单套件（`@deepseek-ai/dsh-client-ui-primitives`）——以及底部粘性保存栏。三个超时均以整秒填写，而旧的 `IOS_SIM_*_MS` 环境变量仍按毫秒读取并自动换算。
+配置命名空间 = profile patch 行 id = `ios-simulator-helper`（同时是 `dsh.name`）。表单注册到「插件」面板的 `plugins.row.config` 槽、以包名与行 id 为键，因此打开在**插件行自己的页面**上——该行的 **Configure** 按钮会进入这个页面——而不再渲染在 bundle 的详情页里；bundle 页保留它的描述、条目与源码。只有当 host 半侧提供该命名空间时它才存在。表单通过 `ctx.configForms` 读写，因此暂存编辑、脏值检测、内联校验、乐观并发（revision）与「已覆盖 / 恢复默认」语义都由 harness 提供。页面负责绘制插件标题、图标与面包屑；表单本身只贡献一行「改动何时生效」的说明、每个分组一张卡片——卡片描边就是分组之间的分隔，度量取自内置设置页所用的同一套表单套件（`@deepseek-ai/dsh-client-ui-primitives`）——以及底部粘性保存栏。三个超时均以整秒填写，而旧的 `IOS_SIM_*_MS` 环境变量仍按毫秒读取并自动换算。
+
+
+
+最后一张卡片里的**在「设置」中显示**开关会把同一份表单也加入「设置」对话框，作为一个带有专属线稿图标的分区。该开关默认关闭，因此新配置只有一个配置页面；打开后分区随开关的出现与消失，无需重载。
 
 保存由一条吸附在表单底部的小药丸条负责：有暂存改动、写入进行中或写入失败时出现，状态点旁写明当前状态，并提供 **放弃改动** 与 **保存**（草稿不合法时保存按钮禁用）。只是把控件改回当前生效值的草稿不算改动；写入成功由一条提示条确认，离开页面会放弃未保存的编辑。
 
@@ -116,6 +120,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | | `logLimit` | 整数 | `20000` | `IOS_SIM_LOG_LIMIT` | `ios_logs` 未指定上限时返回的最大字符数 |
 | 输出目录 | `dataDir` | 文本 | 空 | `IOS_SIM_PLUGIN_DATA` | 截图、构建日志与 DerivedData 的根目录；留空用 `$DSH_HOME/ios-simulator-helper`，其次 `~/.dsh/ios-simulator-helper` |
 | | `screenshotDir` | 文本 | 空 | `IOS_SIM_SCREENSHOT_DIR` | 留空用 `<数据目录>/screenshots` |
+| 页面位置 | `showInSettings` | 开关 | 关 | — | 开启后同一份表单也会作为分区出现在「设置」对话框中，并带有专属图标 |
 
 表单底部是宿主检测与两个按钮/结果区：
 
@@ -130,6 +135,8 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 ## 截图
 
 四张都是 DSH harness 0.2.1-rc.2 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。展示的是「插件」页该插件详情页里的参数表单、1.1.0 的卡片式布局与按整秒填写的超时；保存操作条只在有暂存改动时出现，因此这几张里看不到它。截图时窗口用的是中文界面，卡片标题为中文，字段名两种语言一致。
+
+> 这几张截图早于「移到插件行自己的页面」这次改动：它们展示的是表单渲染在 bundle 详情页里的旧位置。页面本身——卡片、字段与保存栏——没有变化，变化的只是打开位置。稍后会从该行的 **Configure** 页面重新截图。
 
 **1. 模拟器与设备** —— 插件标题与描述，以及每次 `ios_*` 调用都会读取的字段：
 
@@ -188,7 +195,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | 方面 | 原插件（ZCode） | 本插件（DSH） |
 |---|---|---|
 | 工具暴露 | stdio MCP 服务器 `ios-simulator`，模型看到 `mcp__ios_simulator__*` | 原生 `ctx.tools.register()`，模型看到 `ios_*` |
-| 用户配置 | `plugin.json` 的 `userConfig`（2 项），经环境变量注入 | 配置页面 17 字段 + schemastery `Config`，全部 `.volatile()` 实时生效；原环境变量仍作回落 |
+| 用户配置 | `plugin.json` 的 `userConfig`（2 项），经环境变量注入 | 配置页面 18 字段 + schemastery `Config`，全部 `.volatile()` 实时生效；原环境变量仍作回落 |
 | 宿主检查 | 仅 `ios_preflight` 里检查一次 `process.platform` | 中央化的 `requireMacOS()`：每个需要 Apple 工具链的入口都会先拒绝；配置页面同步 + 权威双重判定 |
 | 工作目录 | `process.cwd()` | `exec.agent.session.header.cwd`（会话工作区） |
 | 数据目录 | `IOS_SIM_PLUGIN_DATA` / 临时目录 | `$DSH_HOME/ios-simulator-helper`，可在配置页面配置 |

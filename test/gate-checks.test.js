@@ -160,6 +160,29 @@ test('a discovery field that names no list at all is reported', async () => {
   assert.match(gate.checkDiscoverySources(ctx).join('\n'), /names no suggest source/)
 })
 
+test('a discovery field without the copy for its unset entry is reported', async () => {
+  const ctx = await context()
+  // A discovery dropdown always offers an entry for the unset value, and its
+  // label is looked up under `option.<key>.any`. That key is derived from the
+  // field table, so a third discovery field cannot ship a page that renders
+  // the raw key in place of a label.
+  const fields = new Map(ctx.host.fields)
+  fields.set('defaultTarget', {
+    ...ctx.host.fields.get('defaultDevice'),
+    key: 'defaultTarget',
+    kind: 'discovery',
+    suggest: 'devices',
+    default: '',
+  })
+  ctx.host = { ...ctx.host, fields }
+  delete ctx.localeEn['option.defaultTarget.any']
+  delete ctx.localeZh['option.defaultTarget.any']
+  assert.match(
+    gate.checkDictionaryCoverage(ctx).join('\n'),
+    /locale\/en\.json declares no "option\.defaultTarget\.any"/,
+  )
+})
+
 test('a group that holds different fields is reported', async () => {
   const ctx = await context()
   const groups = ctx.exported.GROUP_META.map((group) =>

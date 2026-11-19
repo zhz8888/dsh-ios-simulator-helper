@@ -451,6 +451,11 @@ export function checkDictionaryCoverage(context) {
     expected.add(`field.${field.key}`)
     expected.add(`field.${field.key}.hint`)
     if (field.placeholder !== undefined) expected.add(`field.${field.key}.placeholder`)
+    // A discovery dropdown always offers an entry for the unset value, and its
+    // label is looked up under this key. The key is derived from the field
+    // table rather than listed by hand in the browser half, so a third
+    // discovery field cannot ship a page that renders the raw key.
+    if (field.kind === 'discovery') expected.add(`option.${field.key}.any`)
   }
   for (const field of clientFields) {
     for (const value of field.optionLabel ?? []) expected.add(`option.${field.key}.${value}`)
@@ -500,6 +505,10 @@ export function checkDictionarySymmetry(context) {
     expected.add(`field.${field.key}`)
     expected.add(`field.${field.key}.hint`)
     if (field.placeholder !== undefined) expected.add(`field.${field.key}.placeholder`)
+    // The unset entry a discovery dropdown offers is looked up under this
+    // key, so a discovery field declares it whether or not the browser half
+    // lists it by hand.
+    if (field.kind === 'discovery') expected.add(`option.${field.key}.any`)
   }
   for (const field of context.exported.FIELD_META ?? []) {
     for (const value of field.optionLabel ?? []) expected.add(`option.${field.key}.${value}`)

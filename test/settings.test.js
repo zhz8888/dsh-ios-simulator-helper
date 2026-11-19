@@ -6,6 +6,7 @@ import {
   FIELD_KEYS,
   FIELDS,
   UI_BACKENDS,
+  XCODE_CONFIGURATIONS,
   defaultDeviceFragment,
   readSettings,
 } from '../lib/settings.js'
@@ -192,6 +193,29 @@ test('an out-of-range select value falls back to the declared default', () => {
   assert.equal(readSettings(liveConfig({ uiBackend: 'appium' }), {}).uiBackend, 'auto')
   assert.equal(readSettings({}, { IOS_SIM_UI_BACKEND: 'appium' }).uiBackend, 'auto')
   assert.deepEqual(UI_BACKENDS, ['auto', 'idb', 'xcodebuildmcp', 'none'])
+})
+
+test('the default configuration is a dropdown over the configurations a build can name', () => {
+  // The field used to be free text. A hand-typed value was always a build
+  // waiting to fail: `xcodebuild -configuration <value>` only accepts what the
+  // project declares, and a generated project declares these three.
+  const field = FIELDS.get('defaultConfiguration')
+  assert.equal(field.kind, 'select')
+  assert.deepEqual(field.options, ['Debug', 'Release', 'Profile'])
+  assert.deepEqual(XCODE_CONFIGURATIONS, ['Debug', 'Release', 'Profile'])
+  assert.equal(field.placeholder, undefined, 'a dropdown has no placeholder')
+  assert.equal(field.default, 'Debug')
+
+  // A stored value from before the field was a dropdown (or typed into the
+  // profile patch by hand) falls back rather than reaching a build.
+  assert.equal(readSettings(liveConfig({ defaultConfiguration: 'Staging' }), {}).defaultConfiguration, 'Debug')
+  assert.equal(readSettings({}, { IOS_SIM_CONFIGURATION: 'Staging' }).defaultConfiguration, 'Debug')
+
+  // The environment fallback keeps working for a value the dropdown offers.
+  assert.equal(readSettings({}, { IOS_SIM_CONFIGURATION: 'Release' }).defaultConfiguration, 'Release')
+
+  // An invalid stored value still falls through to a valid environment value.
+  assert.equal(readSettings(liveConfig({ defaultConfiguration: 'Staging' }), { IOS_SIM_CONFIGURATION: 'Release' }).defaultConfiguration, 'Release')
 })
 
 test('an invalid select still falls through to a valid environment value', () => {

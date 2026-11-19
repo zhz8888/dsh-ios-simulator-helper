@@ -111,7 +111,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | UI 自动化 | `uiBackend` | 下拉 | `auto` | `IOS_SIM_UI_BACKEND` | `auto` 探测 idb；`idb` 强制要求；`none` 关闭 UI 工具；`xcodebuildmcp` 为保留值 |
 | | `idbBinary` | 文本 | `idb` | `IOS_SIM_IDB_BINARY` | idb 命令名或绝对路径 |
 | | `uiTimeoutSeconds` | 整数 | `60` | `IOS_SIM_UI_TIMEOUT_MS`（毫秒） | 单次 idb UI 命令的最长运行时间，单位为秒；旧变量为毫秒 |
-| 构建与 DerivedData | `defaultConfiguration` | 文本 | `Debug` | `IOS_SIM_CONFIGURATION` | 工具未指定 `configuration` 时使用 |
+| 构建与 DerivedData | `defaultConfiguration` | 下拉（`Debug`、`Release`、`Profile`） | `Debug` | `IOS_SIM_CONFIGURATION` | 工具未指定 `configuration` 时使用的 Xcode 构建配置 |
 | | `buildTimeoutSeconds` | 整数 | `600` | `IOS_SIM_BUILD_TIMEOUT_MS`（毫秒） | 一次 `xcodebuild build` 的最长运行时间，单位为秒；旧变量为毫秒 |
 | | `extraBuildArgs` | 多行文本 | 空 | `IOS_SIM_EXTRA_BUILD_ARGS` | 每行一个参数，`#` 为注释；插在 `-derivedDataPath` 之后、`build` 之前 |
 | | `derivedDataDir` | 文本 | 空 | `IOS_SIM_DERIVED_DATA_DIR` | 留空用 `<数据目录>/DerivedData/<项目指纹>` |

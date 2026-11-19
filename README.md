@@ -111,7 +111,7 @@ Saving happens in a pill that sticks to the bottom of the form: it appears while
 | UI automation | `uiBackend` | select | `auto` | `IOS_SIM_UI_BACKEND` | `auto` probes for `idb`; `idb` requires it; `none` disables the UI tools; `xcodebuildmcp` is reserved. |
 | | `idbBinary` | text | `idb` | `IOS_SIM_IDB_BINARY` | Command name or absolute path of `idb`. |
 | | `uiTimeoutSeconds` | integer | `60` | `IOS_SIM_UI_TIMEOUT_MS` (ms) | Longest runtime of one `idb` UI command, in seconds; the legacy variable is milliseconds. |
-| Build and DerivedData | `defaultConfiguration` | text | `Debug` | `IOS_SIM_CONFIGURATION` | Used when a tool names no `configuration`. |
+| Build and DerivedData | `defaultConfiguration` | dropdown (`Debug`, `Release`, `Profile`) | `Debug` | `IOS_SIM_CONFIGURATION` | The Xcode configuration a build uses when a tool names no `configuration`. |
 | | `buildTimeoutSeconds` | integer | `600` | `IOS_SIM_BUILD_TIMEOUT_MS` (ms) | Longest runtime of one `xcodebuild build`, in seconds; the legacy variable is milliseconds. |
 | | `extraBuildArgs` | multiline | empty | `IOS_SIM_EXTRA_BUILD_ARGS` | One argument per line, `#` starts a comment; inserted after `-derivedDataPath` and before `build`. |
 | | `derivedDataDir` | text | empty | `IOS_SIM_DERIVED_DATA_DIR` | Empty uses `<data dir>/DerivedData/<project fingerprint>`. |

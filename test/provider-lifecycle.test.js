@@ -459,6 +459,57 @@ test('a shutdown refused because the device is already down is the documented no
   }
 })
 
+test('the shutdown result reports the state the device is in, not the one it was in', async () => {
+  // F1 of the 2026-11-19 functional test report: `simulator.state` was the
+  // pre-command snapshot, so a result said `shutdown: true` with
+  // `state: "Booted"` — and a device CoreSimulatorService was still finishing
+  // booting behind a `shutdown: true` is the same contradiction seen from the
+  // other side. The provider re-reads the device once, so the reported state
+  // is the device's own; the re-read failing keeps the old record rather than
+  // failing a command that answered.
+  seam.reset()
+  seam.allowMutations = true
+  // The pick read finds the device booted; the re-read the shutdown triggers
+  // finds it down, as `simctl shutdown` leaves it.
+  seam.deviceReads.push(devicesPayload([{ name: 'iPhone 18 Pro', udid: PHONE_UDID, state: 'Booted', isAvailable: true }]))
+  seam.deviceReads.push(devicesPayload([{ name: 'iPhone 18 Pro', udid: PHONE_UDID, state: 'Shutdown', isAvailable: true }]))
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-shutdown-state-'))
+  try {
+    const result = await shutdown(runtimeFor(root), { udid: PHONE_UDID })
+    assert.equal(result.shutdown, true)
+    assert.equal(result.wasBooted, true, 'the snapshot before the command is kept')
+    assert.equal(result.simulator.state, 'Shutdown', 'the reported state is the re-read one')
+    assert.equal(result.simulator.udid, PHONE_UDID)
+    // Exactly one re-read: the pick read, the shutdown and the confirm read.
+    const reads = seam.calls.filter((item) => item.line === 'xcrun simctl list devices --json')
+    assert.equal(reads.length, 2, 'the device list is enumerated once to pick and once to confirm')
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a shutdown whose confirming re-read fails still reports the shutdown', async () => {
+  // The re-read is evidence, not the operation. A failed device enumeration
+  // must not turn an accepted shutdown into a failed call, and it must not
+  // resurrect the pre-command state as if it were current.
+  seam.reset()
+  seam.allowMutations = true
+  seam.deviceReads.push(devicesPayload([{ name: 'iPhone 18 Pro', udid: PHONE_UDID, state: 'Booted', isAvailable: true }]))
+  seam.deviceReads.push({ code: 1, stderr: 'offline-seam: the re-read failed\n' })
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-shutdown-reread-'))
+  try {
+    const result = await shutdown(runtimeFor(root), { udid: PHONE_UDID })
+    assert.equal(result.shutdown, true)
+    assert.equal(result.wasBooted, true)
+    assert.equal(result.simulator.udid, PHONE_UDID)
+    assert.equal(result.simulator.state, 'Booted', 'the snapshot stands when nothing fresher could be read')
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('the cases above reach no unstubbed command', () => {
   assert.deepEqual(seam.unknown, [], 'an unstubbed command was reached; stub it in test/helpers/offline-seam.mjs')
 })

@@ -31,7 +31,8 @@ import path from 'node:path'
  * A case that needs to observe something other than a plain success edits
  * {@link seam} before the call: `seam.allowMutations` answers the `simctl`
  * verbs that change device state (as a canned success, never on the machine),
- * `seam.devices` / `seam.runtimes` replace the enumerated lists, `seam.list` /
+ * `seam.devices` / `seam.runtimes` replace the enumerated lists,
+ * `seam.deviceReads` queues per-read device answers, `seam.list` /
  * `seam.build` change the two `xcodebuild` answers, `seam.idbInstalled` makes
  * the `idb` probe succeed, and `seam.reset()` puts everything back. Every call
  * is recorded in `seam.calls` with the argv and the working directory the
@@ -120,6 +121,7 @@ function knobDefaults() {
     idbInstalled: false,
     buildProduct: false,
     devices: undefined,
+    deviceReads: [],
     runtimes: undefined,
     list: undefined,
     build: undefined,
@@ -158,6 +160,15 @@ export const seam = {
   buildProduct: false,
   /** Replace the `simctl list devices --json` answer (a JSON string or a `{code, stdout, stderr}` record). */
   devices: undefined,
+  /**
+   * Queued `simctl list devices --json` answers, consumed one per read before
+   * the default payload.
+   *
+   * A queue rather than a single answer because the interesting case is a
+   * *sequence*: the pick read sees a device in one state and the re-read a
+   * state-changing command triggers sees it in the next.
+   */
+  deviceReads: [],
   /** Replace the `simctl list runtimes --json` answer. */
   runtimes: undefined,
   /** Replace the `xcodebuild -list -json` answer, to exercise a failed scheme listing. */
@@ -304,6 +315,7 @@ function cannedChild({ stdout = '', stderr = '', code = 0, delayMs = 0 }) {
  * ones that read the argv rather than matching it literally.
  */
 function answerFor(argv, line) {
+  if (line === 'xcrun simctl list devices --json' && seam.deviceReads.length > 0) return answer(seam.deviceReads.shift())
   if (line === 'xcrun simctl list devices --json' && seam.devices !== undefined) return answer(seam.devices)
   if (line === 'xcrun simctl list runtimes --json' && seam.runtimes !== undefined) return answer(seam.runtimes)
   if (line.startsWith('xcodebuild -list -json ') && seam.list !== undefined) return answer(seam.list)
@@ -312,7 +324,10 @@ function answerFor(argv, line) {
   const canned = ANSWERS.find((item) => item.argv === line)
   if (canned) return canned
 
-  if (line === 'xcrun simctl list devices --json') return { stdout: JSON.stringify(seam.devices ?? DEVICES) }
+  if (line === 'xcrun simctl list devices --json') {
+    if (seam.deviceReads.length > 0) return answer(seam.deviceReads.shift())
+    return { stdout: JSON.stringify(seam.devices ?? DEVICES) }
+  }
   if (line === 'xcrun simctl list runtimes --json') return { stdout: JSON.stringify(seam.runtimes ?? RUNTIMES) }
   if (line === 'idb --version') {
     return seam.idbInstalled

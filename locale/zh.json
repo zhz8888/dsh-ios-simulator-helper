@@ -89,7 +89,7 @@
     "group.output": "输出目录",
     "group.output.hint": "截图、构建日志与 DerivedData 的落盘位置。",
     "field.dataDir": "数据目录",
-    "field.dataDir.hint": "截图、日志与 DerivedData 的根目录；留空时使用 $DSH_HOME/ios-simulator-helper，其次 ~/.dsh/ios-simulator-helper。",
+    "field.dataDir.hint": "截图、日志与 DerivedData 的根目录；留空时使用 $DSH_HOME/ios-simulator-helper，其次 ~/.dsh/ios-simulator-helper，最后是系统临时目录。",
     "field.screenshotDir": "截图目录",
     "field.screenshotDir.hint": "留空时使用数据目录下的 screenshots。",
     "field.idbBinary.placeholder": "idb",

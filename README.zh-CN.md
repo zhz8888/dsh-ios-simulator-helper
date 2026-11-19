@@ -76,7 +76,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper@latest   # 
 dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # 卸载
 ```
 
-设置保存在 profile 里而不是包里，所以这两条命令都不会动它。数据目录（默认 `$DSH_HOME/ios-simulator-helper`）存放截图、构建日志与 DerivedData，卸载不会删除它，是否清理由你决定。
+设置保存在 profile 里而不是包里，所以这两条命令都不会动它。数据目录（默认 `$DSH_HOME/ios-simulator-helper`；未设置 `DSH_HOME` 时落到 `~/.dsh` 下，两者都不可写时最后回落到系统临时目录）存放截图、构建日志与 DerivedData，卸载不会删除它，是否清理由你决定。
 
 ### 版本闸门
 
@@ -118,7 +118,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | | `disableCodeSigning` | 开关 | 开 | `IOS_SIM_DISABLE_CODE_SIGNING` | 原插件固定传 `CODE_SIGNING_ALLOWED=NO`；关闭后交给 Xcode 决定 |
 | 日志 | `logSeconds` | 整数 | `120` | `IOS_SIM_LOG_SECONDS` | `ios_logs` 未指定窗口时读取的最近秒数，上限 3600 |
 | | `logLimit` | 整数 | `20000` | `IOS_SIM_LOG_LIMIT` | `ios_logs` 未指定上限时返回的最大字符数 |
-| 输出目录 | `dataDir` | 文本 | 空 | `IOS_SIM_PLUGIN_DATA` | 截图、构建日志与 DerivedData 的根目录；留空用 `$DSH_HOME/ios-simulator-helper`，其次 `~/.dsh/ios-simulator-helper` |
+| 输出目录 | `dataDir` | 文本 | 空 | `IOS_SIM_PLUGIN_DATA` | 截图、构建日志与 DerivedData 的根目录；留空用 `$DSH_HOME/ios-simulator-helper`，其次 `~/.dsh/ios-simulator-helper`，最后是系统临时目录 |
 | | `screenshotDir` | 文本 | 空 | `IOS_SIM_SCREENSHOT_DIR` | 留空用 `<数据目录>/screenshots` |
 | 页面位置 | `showInSettings` | 开关 | 关 | — | 开启后同一份表单也会作为分区出现在「设置」对话框中，并带有专属图标 |
 

@@ -89,7 +89,7 @@
     "group.output": "Output directories",
     "group.output.hint": "Where screenshots, build logs and DerivedData are written.",
     "field.dataDir": "Data directory",
-    "field.dataDir.hint": "Root for screenshots, logs and DerivedData; empty uses $DSH_HOME/ios-simulator-helper, then ~/.dsh/ios-simulator-helper.",
+    "field.dataDir.hint": "Root for screenshots, logs and DerivedData; empty uses $DSH_HOME/ios-simulator-helper, then ~/.dsh/ios-simulator-helper, and finally the system temp directory.",
     "field.screenshotDir": "Screenshot directory",
     "field.screenshotDir.hint": "Empty uses `screenshots` under the data directory.",
     "field.idbBinary.placeholder": "idb",

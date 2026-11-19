@@ -76,7 +76,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper@latest   # 
 dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # uninstall
 ```
 
-Settings live in the profile, not in the package, so both commands leave them in place. The data directory (by default `$DSH_HOME/ios-simulator-helper`) holds screenshots, build logs and DerivedData; it is yours to delete, and uninstalling does not touch it.
+Settings live in the profile, not in the package, so both commands leave them in place. The data directory (by default `$DSH_HOME/ios-simulator-helper`; without a `DSH_HOME` it moves under `~/.dsh`, and a host with neither writable falls back to the system temp directory) holds screenshots, build logs and DerivedData; it is yours to delete, and uninstalling does not touch it.
 
 ### Version gate
 
@@ -118,7 +118,7 @@ Saving happens in a pill that sticks to the bottom of the form: it appears while
 | | `disableCodeSigning` | switch | on | `IOS_SIM_DISABLE_CODE_SIGNING` | The original always passed `CODE_SIGNING_ALLOWED=NO`; off lets Xcode decide. |
 | Logs | `logSeconds` | integer | `120` | `IOS_SIM_LOG_SECONDS` | Recent seconds `ios_logs` reads when the call names no window; capped at 3600. |
 | | `logLimit` | integer | `20000` | `IOS_SIM_LOG_LIMIT` | Largest rendered log `ios_logs` returns when the call names no limit. |
-| Output directories | `dataDir` | text | empty | `IOS_SIM_PLUGIN_DATA` | Root for screenshots, build logs and DerivedData; empty uses `$DSH_HOME/ios-simulator-helper`, then `~/.dsh/ios-simulator-helper`. |
+| Output directories | `dataDir` | text | empty | `IOS_SIM_PLUGIN_DATA` | Root for screenshots, build logs and DerivedData; empty uses `$DSH_HOME/ios-simulator-helper`, then `~/.dsh/ios-simulator-helper`, and finally the system temp directory. |
 | | `screenshotDir` | text | empty | `IOS_SIM_SCREENSHOT_DIR` | Empty uses `<data dir>/screenshots`. |
 | Where the page lives | `showInSettings` | switch | off | — | When on, the same form also appears as a section in the Settings dialog, under its own icon. |
 

@@ -41,7 +41,7 @@
     "runtimes": "Installed runtimes",
     "simulators": "Available simulators",
     "none": "none found",
-    "notFound": "not in this machine's list",
+    "notFound": "{name} — not in this machine's list",
     "group.target": "Simulator and device",
     "group.target.hint": "Which simulator to use, and whether it is booted and shown automatically when needed.",
     "field.defaultDevice": "Default device",

@@ -188,10 +188,13 @@ test('the dropdowns are fed by the inventory route, one list per source', () => 
   assert.deepEqual(Object.keys(built).sort(), ['devices', 'runtimes'])
   assert.deepEqual(built.devices, [{ value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true }])
   assert.deepEqual(built.runtimes, [{ value: 'iOS-27-1', label: 'iOS 27.1', found: true }])
-  // Before the inventory answers, every list is empty rather than undefined: a
-  // field whose list is missing would render an empty dropdown either way, and
-  // the gate is what refuses a name the page does not build.
-  assert.deepEqual(report.discoveryApi.suggestionsEmpty, { devices: [], runtimes: [] })
+  // Before the inventory answers, no list is known: an empty list is a finding
+  // (the host looked and found nothing), and only a known list may mark a
+  // stored value as missing.
+  assert.deepEqual(report.discoveryApi.suggestionsEmpty, { devices: null, runtimes: null })
+  // A host that cannot run the simulator stack enumerated nothing either, so
+  // it knows nothing about the stored value either.
+  assert.deepEqual(report.discoveryApi.suggestionsUnsupported, { devices: null, runtimes: null })
 })
 
 test('a value this machine no longer has stays visible, and an unset value has an entry', () => {
@@ -207,6 +210,39 @@ test('a value this machine no longer has stays visible, and an unset value has a
   assert.deepEqual(report.discoveryApi.emptyValue, [
     { value: '', label: '', found: true },
     { value: 'iOS-27-1', label: 'iOS 27.1', found: true },
+  ])
+})
+
+test('a value is not marked missing while the host has not answered', () => {
+  // The dropdown claims to hold what this machine has, so it must not call a
+  // device missing while the inventory request is still in flight - and must
+  // not keep calling it missing when the request fails and never answers.
+  assert.deepEqual(report.discoveryApi.unknownList, [
+    { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
+  ])
+})
+
+test('the marker for a missing value is the locale string, with the value in it', () => {
+  // The wording belongs to the locale files, punctuation included: the browser
+  // half carries no copy of its own, and a separator spelled in the bundle is
+  // a second source of copy that can drift.
+  assert.equal(report.discoveryApi.markerLabel, 'iPhone 99 — not in this machine\'s list')
+  assert.equal(report.discoveryApi.unsetLabel, 'Not set (the plugin\'s fallback decides)')
+})
+
+test('a value the host still resolves is not marked missing', () => {
+  // The picker matches a fragment: a device whose name contains the stored
+  // value. A profile that named `iPad mini` keeps working, so the page must
+  // not tell the user to re-pick a setting that is in effect.
+  assert.deepEqual(report.discoveryApi.fragmentStillResolves, [
+    { value: 'iPad mini (A17 Pro)', label: 'iPad mini (A17 Pro)', found: true },
+    { value: 'iPad mini', label: 'iPad mini', found: true },
+  ])
+  // A value nothing on this machine answers to is still marked, so a deleted
+  // device stays visible as something to fix.
+  assert.deepEqual(report.discoveryApi.fragmentGone, [
+    { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
+    { value: 'iPad Air', label: 'iPad Air', found: false },
   ])
 })
 

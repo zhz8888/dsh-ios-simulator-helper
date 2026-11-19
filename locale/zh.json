@@ -41,7 +41,7 @@
     "runtimes": "已安装运行时",
     "simulators": "可用模拟器",
     "none": "未发现",
-    "notFound": "不在本机列表中",
+    "notFound": "{name}（不在本机列表中）",
     "group.target": "模拟器与设备",
     "group.target.hint": "选择哪个模拟器，以及需要时是否自动启动并打开模拟器窗口。",
     "field.defaultDevice": "默认设备",

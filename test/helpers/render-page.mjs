@@ -319,12 +319,39 @@ try {
       ],
     }),
     suggestionsEmpty: api.buildSuggestions(undefined),
+    suggestionsUnsupported: api.buildSuggestions({ supported: false }),
     keepsStoredValue: api.discoveryOptions('iPhone 99', [
       { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
     ]),
     emptyValue: api.discoveryOptions('', [
       { value: 'iOS-27-1', label: 'iOS 27.1', found: true },
     ]),
+    // Nothing is known while the host has not answered, so nothing is marked.
+    unknownList: api.discoveryOptions('iPhone 18 Pro', undefined),
+    // A fragment the host still answers to is a working setting, not a
+    // missing one: the picker matches a device whose name contains it.
+    fragmentStillResolves: api.discoveryOptions('iPad mini', [
+      { value: 'iPad mini (A17 Pro)', label: 'iPad mini (A17 Pro)', found: true },
+    ]),
+    fragmentGone: api.discoveryOptions('iPad Air', [
+      { value: 'iPhone 18 Pro', label: 'iPhone 18 Pro', found: true },
+    ]),
+    // The marker's text is the locale's, punctuation included, so the value is
+    // interpolated into it rather than concatenated onto it.
+    markerLabel: api.discoveryOptionLabel(
+      { key: 'defaultDevice' },
+      { value: 'iPhone 99', label: 'iPhone 99', found: false },
+      (key, values) =>
+        String(pageGlobals().__DSH_IOS_SIMULATOR_HELPER_LOCALE__.en[key] ?? key).replace(
+          /\{(\w+)\}/g,
+          (_, name) => String(values?.[name] ?? ''),
+        ),
+    ),
+    unsetLabel: api.discoveryOptionLabel(
+      { key: 'defaultDevice' },
+      { value: '', label: '', found: true },
+      (key) => String(pageGlobals().__DSH_IOS_SIMULATOR_HELPER_LOCALE__.en[key] ?? key),
+    ),
   }
 } catch (error) {
   report.failures.push(`DISCOVERY_API threw: ${error.message}`)

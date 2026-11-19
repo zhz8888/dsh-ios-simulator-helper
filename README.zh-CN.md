@@ -76,7 +76,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper@latest   # 
 dsh plugin --profile <profile> remove @zhz8888/dsh-ios-simulator-helper      # 卸载
 ```
 
-设置保存在 profile 里而不是包里，所以这两条命令都不会动它。数据目录（默认 `$DSH_HOME/ios-simulator-helper`；未设置 `DSH_HOME` 时落到 `~/.dsh` 下，两者都不可写时最后回落到系统临时目录）存放截图、构建日志与 DerivedData，卸载不会删除它，是否清理由你决定。
+设置保存在 profile 里而不是包里，所以这两条命令都不会动它。数据目录（默认 `$DSH_HOME/ios-simulator-helper`；未设置 `DSH_HOME` 时落到 `~/.dsh` 下，两者都不可写时最后回落到系统临时目录）存放截图、构建日志与构建数据，卸载不会删除它，是否清理由你决定。
 
 ### 版本闸门
 
@@ -111,14 +111,14 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | UI 自动化 | `uiBackend` | 下拉 | `auto` | `IOS_SIM_UI_BACKEND` | `auto` 探测 idb；`idb` 强制要求；`none` 关闭 UI 工具；`xcodebuildmcp` 为保留值 |
 | | `idbBinary` | 文本 | `idb` | `IOS_SIM_IDB_BINARY` | idb 命令名或绝对路径 |
 | | `uiTimeoutSeconds` | 整数 | `60` | `IOS_SIM_UI_TIMEOUT_MS`（毫秒） | 单次 idb UI 命令的最长运行时间，单位为秒；旧变量为毫秒 |
-| 构建与 DerivedData | `defaultConfiguration` | 下拉（`Debug`、`Release`、`Profile`） | `Debug` | `IOS_SIM_CONFIGURATION` | 工具未指定 `configuration` 时使用的 Xcode 构建配置 |
+| 构建与构建数据 | `defaultConfiguration` | 下拉（`Debug`、`Release`、`Profile`） | `Debug` | `IOS_SIM_CONFIGURATION` | 工具未指定 `configuration` 时使用的 Xcode 构建配置 |
 | | `buildTimeoutSeconds` | 整数 | `600` | `IOS_SIM_BUILD_TIMEOUT_MS`（毫秒） | 一次 `xcodebuild build` 的最长运行时间，单位为秒；旧变量为毫秒 |
 | | `extraBuildArgs` | 多行文本 | 空 | `IOS_SIM_EXTRA_BUILD_ARGS` | 每行一个参数，`#` 为注释；插在 `-derivedDataPath` 之后、`build` 之前 |
-| | `derivedDataDir` | 文本 | 空 | `IOS_SIM_DERIVED_DATA_DIR` | 留空用 `<数据目录>/DerivedData/<项目指纹>` |
+| | `derivedDataDir` | 文本 | 空 | `IOS_SIM_DERIVED_DATA_DIR` | 构建数据目录；留空用 `<数据目录>/DerivedData/<项目指纹>` |
 | | `disableCodeSigning` | 开关 | 开 | `IOS_SIM_DISABLE_CODE_SIGNING` | 原插件固定传 `CODE_SIGNING_ALLOWED=NO`；关闭后交给 Xcode 决定 |
 | 日志 | `logSeconds` | 整数 | `120` | `IOS_SIM_LOG_SECONDS` | `ios_logs` 未指定窗口时读取的最近秒数，上限 3600 |
 | | `logLimit` | 整数 | `20000` | `IOS_SIM_LOG_LIMIT` | `ios_logs` 未指定上限时返回的最大字符数 |
-| 输出目录 | `dataDir` | 文本 | 空 | `IOS_SIM_PLUGIN_DATA` | 截图、构建日志与 DerivedData 的根目录；留空用 `$DSH_HOME/ios-simulator-helper`，其次 `~/.dsh/ios-simulator-helper`，最后是系统临时目录 |
+| 输出目录 | `dataDir` | 文本 | 空 | `IOS_SIM_PLUGIN_DATA` | 截图、构建日志与构建数据的根目录；留空用 `$DSH_HOME/ios-simulator-helper`，其次 `~/.dsh/ios-simulator-helper`，最后是系统临时目录 |
 | | `screenshotDir` | 文本 | 空 | `IOS_SIM_SCREENSHOT_DIR` | 留空用 `<数据目录>/screenshots` |
 | 页面位置 | `showInSettings` | 开关 | 关 | — | 开启后同一份表单也会作为分区出现在「设置」对话框中，并带有专属图标 |
 
@@ -146,11 +146,11 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ![表单滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. 构建尾部与日志** —— DerivedData 目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限，以及输出目录的开头：
+**3. 构建尾部与日志** —— 构建数据目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限，以及输出目录的开头：
 
-![表单继续向下滚动：DerivedData 目录、构建时禁用代码签名，接着是默认日志窗口与默认日志字符上限，以及数据目录与截图目录的开头](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![表单继续向下滚动：构建数据目录、构建时禁用代码签名，接着是默认日志窗口与默认日志字符上限，以及数据目录与截图目录的开头](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
-**4. 输出目录与宿主检测** —— 截图/日志/DerivedData 的落盘位置，然后是 macOS 判定与两个检测按钮：
+**4. 输出目录与宿主检测** —— 截图/日志/构建数据的落盘位置，然后是 macOS 判定与两个检测按钮：
 
 ![表单底部：数据目录与截图目录，以及宿主系统判定为「macOS —— 符合要求（darwin/arm64）」与检测环境、刷新模拟器两个按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 

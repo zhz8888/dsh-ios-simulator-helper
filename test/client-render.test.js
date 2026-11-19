@@ -246,14 +246,48 @@ test('a value the host still resolves is not marked missing', () => {
   ])
 })
 
-test('every field is a stacked label/control/hint block', () => {
-  const blocks = report.variants.macos.split('class="ismh_field"').slice(1)
+test('text fields stack, and the switches sit on the row right-hand side', () => {
+  // Text inputs, selects and textareas keep the stacked frame: a 100%-wide
+  // control under its label is the natural reading order. A switch reads as
+  // a row instead — label and hint on the left, the track pinned to the
+  // right edge (`margin-left:auto`), so every switch lines up on one column.
+  const markup = report.variants.macos
+  // Split on the whole class attribute, quote included: `ismh_fieldRowText`
+  // and `ismh_fieldRowControl` carry `ismh_field` as a prefix, and a split on
+  // the prefix alone would count them as field blocks of their own.
+  const blocks = [...markup.matchAll(/class="ismh_field( ismh_fieldRow)?"/g)].map((match) => ({
+    row: match[1] !== undefined,
+    body: markup.slice(match.index + match[0].length, match.index + match[0].length + 4000),
+  }))
   assert.equal(blocks.length, 18, 'one block per field')
-  for (const block of blocks) {
-    const label = block.indexOf('ismh_label')
-    const at = [block.indexOf('ismh_control'), block.indexOf('role="switch"')].filter((index) => index >= 0)
+
+  // The four switches of the field table render as rows; every other control
+  // keeps the stacked label/control/hint order inside its block. The lookup
+  // goes through the key→label pair the helper collects, because the markup
+  // carries the translated copy, not the dictionary keys.
+  const switchKeys = ['autoBootSimulator', 'autoOpenSimulator', 'disableCodeSigning', 'showInSettings']
+  for (const key of switchKeys) {
+    const label = report.fieldLabels[report.fieldKeys.indexOf(key)]
+    assert.ok(label, `${key} must have a label the helper collected`)
+    const row = blocks.find((block) => block.row && block.body.includes(`>${label}<`))
+    assert.ok(row, `${key} must render as a row`)
+    const at = row.body.indexOf('ismh_label')
+    const hint = row.body.indexOf('ismh_hint')
+    const track = row.body.indexOf('role="switch"')
+    const control = row.body.indexOf('ismh_fieldRowControl')
+    assert.ok(at >= 0 && hint > at, 'the text column holds label then hint')
+    assert.ok(control > hint, 'the control column comes after the text column')
+    assert.ok(track > control, 'the track sits inside the control column, on the right')
+  }
+
+  const stacked = blocks.filter((block) => !block.row)
+  assert.equal(stacked.length, 14, 'the other fourteen fields keep the stacked block')
+  for (const block of stacked) {
+    const body = block.body
+    const label = body.indexOf('ismh_label')
+    const at = [body.indexOf('ismh_control'), body.indexOf('role="switch"')].filter((index) => index >= 0)
     const control = Math.min(...at)
-    const hint = block.indexOf('ismh_hint')
+    const hint = body.indexOf('ismh_hint')
     assert.ok(label >= 0 && control > label, 'the label comes before its control')
     assert.ok(hint > control, 'the hint comes after the control')
   }

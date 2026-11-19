@@ -134,7 +134,7 @@ The original plugin's `userConfig` (`default_device`, `ui_backend`) and its envi
 
 ## Screenshots
 
-All four are the live page in DSH harness 0.2.1-rc.2, in the order you scroll it — nothing is mocked up. They show the form inside the plugin's own detail view in the Plugins panel, the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the card headings are Chinese while every field name is the same in both languages.
+All four are the live page in DSH harness 0.2.1-rc.2, in the order you scroll it — nothing is mocked up. They show the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the card headings are Chinese while every field name is the same in both languages.
 
 > These shots predate the move to the plugin row's own page: they show the form inside the bundle's detail view, which is where it used to render. The page itself — the cards, the fields and the save bar — is unchanged; only where it opens has moved. They will be re-captured from the row's **Configure** page.
 

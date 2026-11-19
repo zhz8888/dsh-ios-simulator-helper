@@ -28,7 +28,7 @@ import { seam } from './helpers/offline-seam.mjs'
 const { shot } = await import('../lib/providers/screenshot.js')
 const { app } = await import('../lib/providers/build.js')
 const { create } = await import('../lib/providers/project.js')
-const { boot, chooseSimulator, parseSimulators, shutdown } = await import('../lib/providers/sim.js')
+const { boot, chooseSimulator, openUrl, parseSimulators, shutdown } = await import('../lib/providers/sim.js')
 const { createRuntime } = await import('../lib/runtime.js')
 
 /** The runtime key the seam's device and runtime payloads use. */
@@ -504,6 +504,32 @@ test('a shutdown whose confirming re-read fails still reports the shutdown', asy
     assert.equal(result.wasBooted, true)
     assert.equal(result.simulator.udid, PHONE_UDID)
     assert.equal(result.simulator.state, 'Booted', 'the snapshot stands when nothing fresher could be read')
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a failed open-url names the URL and the device, not only Apple\'s code', async () => {
+  // F7 of the 2026-11-19 functional test report: a scheme with no handler
+  // surfaced as `LSApplicationWorkspaceErrorDomain code=115` alone, which
+  // reads as if the plugin had failed rather than the URL. The provider's own
+  // validations already speak for themselves (`A url is required.`); Apple's
+  // raw refusal is the one message that did not.
+  seam.reset()
+  seam.allowMutations = true
+  seam.simctl.openurl = { code: 1, stderr: 'An error was encountered processing the command (domain=LSApplicationWorkspaceErrorDomain, code=115): no application handles the URL\n' }
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-openurl-fail-'))
+  try {
+    await assert.rejects(
+      () => openUrl(runtimeFor(root), PHONE_UDID, 'ftp://example.com'),
+      (error) => {
+        assert.match(error.message, /Could not open ftp:\/\/example\.com/)
+        assert.match(error.message, new RegExp(PHONE_UDID))
+        assert.match(error.message, /LSApplicationWorkspaceErrorDomain, code=115/, 'Apple\'s own text is kept, not replaced')
+        return true
+      },
+    )
   } finally {
     seam.reset()
     await rm(root, { recursive: true, force: true })

@@ -7,7 +7,7 @@
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 [![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
-A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a **parameter page on the plugin's own detail page** in the Plugins panel (Plugins → Installed plugins → iOS Simulator Helper) that edits the simulator parameters in-app instead of through environment variables.
+A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a **parameter page on the plugin's own page** in the Plugins panel (Plugins → Installed plugins → iOS Simulator Helper) that edits the simulator parameters in-app instead of through environment variables.
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
 - 18 settings fields in 6 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.

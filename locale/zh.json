@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "iOS 模拟器助手",
-    "description": "非官方助手：在 DeepSeek Harness 里驱动 Apple 的 iOS 模拟器，21 个原生 ios_* 工具覆盖工程发现、构建、安装、启动、截图与日志；模拟器、idb 后端与 xcodebuild 参数在「插件」页该插件的详情页里配置。与 Apple 无隶属关系。"
+    "description": "非官方助手：在 DeepSeek Harness 里驱动 Apple 的 iOS 模拟器，21 个原生 ios_* 工具覆盖工程发现、构建、安装、启动、截图与日志；模拟器、idb 后端与 xcodebuild 参数在「插件」页该插件自己的页面里配置。与 Apple 无隶属关系。"
   },
   "settings": {
     "intro": "改动会写入当前 profile，并在下一次工具调用时生效。",

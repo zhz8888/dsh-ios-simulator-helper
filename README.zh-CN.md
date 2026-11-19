@@ -7,7 +7,7 @@
 ![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 [![target: DSH](https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2-blue.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
-把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个**参数表单**，渲染在「插件」页该插件的详情页里（插件 → 已安装插件 → iOS 模拟器助手），让默认设备、运行时、UI 后端、构建参数与输出目录在应用里配置，而不是靠环境变量。
+把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个**参数表单**，渲染在「插件」页该插件自己的页面里（插件 → 已安装插件 → iOS 模拟器助手），让默认设备、运行时、UI 后端、构建参数与输出目录在应用里配置，而不是靠环境变量。
 
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
 - 参数页 6 组 18 个字段，全部实时生效；空值按「参数页 → 原插件环境变量 → 内置默认值」顺序回落。

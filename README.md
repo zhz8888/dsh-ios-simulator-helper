@@ -10,7 +10,7 @@
 A DeepSeek Harness (DSH) native port of the official ZCode `ios-simulator@0.1.0` plugin: all 20 original MCP tools preserved as native DSH tools, plus a **parameter page on the plugin's own page** in the Plugins panel (Plugins → Installed plugins → iOS Simulator Helper) that edits the simulator parameters in-app instead of through environment variables.
 
 - Tool and argument names are identical to the original, so workflows written for the `ios_simulator` MCP server keep working; one tool is added — `ios_shutdown_simulator`, because the original could boot a simulator but never stop one.
-- 18 settings fields in 6 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
+- 19 settings fields in 6 groups, all live-editable; an empty field falls back to the original plugin's `IOS_SIM_*` variable, then to the built-in default.
 - The parameter page detects the host system and, **on a non-macOS host, states that this plugin only supports macOS**; every tool that drives Apple tooling then refuses with a clear message instead of failing with `spawn xcrun ENOENT`, while `ios_preflight` reports the failing host check and `ios_discover_project`, `ios_create_app` and `ios_ui_status` still answer.
 - Published as `@zhz8888/dsh-ios-simulator-helper`; the plugin page shows **iOS Simulator Helper** / **iOS 模拟器助手** from `locale/` rather than the raw package name, and both descriptions say the plugin is unofficial and not affiliated with Apple.
 
@@ -106,6 +106,7 @@ Saving happens in a pill that sticks to the bottom of the form: it appears while
 | Simulator and device | `defaultDevice` | dropdown (this machine's simulators) | empty | `IOS_SIM_DEFAULT_DEVICE` | The simulator the tools use when a call names no `udid`/`device`, picked from the simulators this machine has. Empty means the plugin's own fallback — the original plugin's `iPhone 16` fragment, then the first available iPhone; a value that is no longer installed is marked. |
 | | `defaultRuntime` | dropdown (this machine's runtimes) | empty | `IOS_SIM_DEFAULT_RUNTIME` | The installed runtime the tools prefer, picked from the runtimes this machine has; the first entry matches any runtime. A **preference, not a requirement**: a stale value widens the pool instead of erroring. |
 | | `autoBootSimulator` | switch | on | `IOS_SIM_AUTO_BOOT` | When off, tools fail instead of running `simctl boot` for a stopped target. |
+| | `exclusiveSimulator` | switch | on | `IOS_SIM_EXCLUSIVE_SIMULATOR` | When on, booting a simulator shuts every other booted one down first, so testing different device types never leaves two running. |
 | | `autoOpenSimulator` | switch | on | `IOS_SIM_AUTO_OPEN` | Matches the original by opening the Simulator window (boot / show / open URL / build and run); off keeps everything headless. |
 | | `bootTimeoutSeconds` | integer | `120` | `IOS_SIM_BOOT_TIMEOUT_MS` (ms) | Longest wait for one `simctl boot` / `bootstatus`, in seconds. The legacy variable keeps its millisecond spelling and is converted. |
 | UI automation | `uiBackend` | select | `auto` | `IOS_SIM_UI_BACKEND` | `auto` probes for `idb`; `idb` requires it; `none` disables the UI tools; `xcodebuildmcp` is reserved. |
@@ -195,7 +196,7 @@ Two behaviours deserve their own note:
 | Aspect | Original (ZCode) | This plugin (DSH) |
 |---|---|---|
 | Tool exposure | stdio MCP server `ios-simulator`; the model sees `mcp__ios_simulator__*` | Native `ctx.tools.register()`; the model sees `ios_*` |
-| User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Configuration page with 18 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
+| User configuration | `plugin.json` `userConfig` (2 items), injected as environment variables | Configuration page with 19 fields on a schemastery `Config`, all `.volatile()`; the old environment variables remain as fallbacks |
 | Host check | `process.platform` read once, inside `ios_preflight` | Centralised `requireMacOS()` in front of every Apple-tooling call, plus the configuration page's synchronous and authoritative verdicts |
 | Working directory | `process.cwd()` | `exec.agent.session.header.cwd` (the session workspace) |
 | Data directory | `IOS_SIM_PLUGIN_DATA` / temp | `$DSH_HOME/ios-simulator-helper`, configurable on the configuration page |

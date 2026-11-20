@@ -510,6 +510,60 @@ test('a shutdown whose confirming re-read fails still reports the shutdown', asy
   }
 })
 
+test('exclusive mode shuts the other booted device down before booting the target', async () => {
+  // A test plan that walks through device types one after another otherwise
+  // leaves every previous device running. With the setting on, booting one
+  // device shuts the others down BEFORE the new boot, so the machine never
+  // holds two running instances mid-transition.
+  seam.reset()
+  seam.allowMutations = true
+  // One enumeration serves both the choice and the exclusive sweep: the list
+  // holds the booted Duo and a shut-down iPhone; the target names the iPhone.
+  seam.devices = devicesPayload([
+    { name: 'iPhone Duo', udid: PAIR_UDID, state: 'Booted', isAvailable: true, deviceTypeIdentifier: PAIR_TYPE },
+    { name: 'iPhone 18 Pro', udid: PHONE_UDID, state: 'Shutdown', isAvailable: true, deviceTypeIdentifier: PHONE_TYPE },
+  ])
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-exclusive-'))
+  try {
+    const result = await boot(runtimeFor(root), { device: 'iPhone 18 Pro' })
+    assert.equal(result.state, 'Booted')
+    const shutdowns = seam.mutated.filter((line) => line.includes(`shutdown ${PAIR_UDID}`))
+    assert.equal(shutdowns.length, 1, 'the other booted device is shut down exactly once')
+    const boots = seam.mutated.filter((line) => line.includes(`boot ${PHONE_UDID}`))
+    assert.equal(boots.length, 1, 'the target is booted')
+    // The shutdown happens BEFORE the boot: no point in the run holds two
+    // booted devices.
+    const shutdownAt = seam.calls.findIndex((item) => item.line.includes(`shutdown ${PAIR_UDID}`))
+    const bootAt = seam.calls.findIndex((item) => item.line.includes(`boot ${PHONE_UDID}`))
+    assert.ok(shutdownAt !== -1 && bootAt !== -1 && shutdownAt < bootAt, 'shutdown precedes boot')
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exclusive mode off leaves the other booted device running', async () => {
+  seam.reset()
+  seam.allowMutations = true
+  seam.devices = devicesPayload([
+    { name: 'iPhone Duo', udid: PAIR_UDID, state: 'Booted', isAvailable: true, deviceTypeIdentifier: PAIR_TYPE },
+    { name: 'iPhone 18 Pro', udid: PHONE_UDID, state: 'Shutdown', isAvailable: true, deviceTypeIdentifier: PHONE_TYPE },
+  ])
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-inclusive-'))
+  try {
+    const result = await boot(runtimeFor(root, { config: { exclusiveSimulator: false } }), { device: 'iPhone 18 Pro' })
+    assert.equal(result.state, 'Booted')
+    assert.deepEqual(
+      seam.mutated.filter((line) => line.includes('shutdown')),
+      [],
+      'no shutdown may run with the setting off',
+    )
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('a failed open-url names the URL and the device, not only Apple\'s code', async () => {
   // F7 of the 2026-11-19 functional test report: a scheme with no handler
   // surfaced as `LSApplicationWorkspaceErrorDomain code=115` alone, which

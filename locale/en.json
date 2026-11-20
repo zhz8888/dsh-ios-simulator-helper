@@ -50,6 +50,8 @@
     "field.defaultRuntime.hint": "The installed runtime the tools prefer when a call names none. Pick one from the list; the first entry matches any runtime. A stored value that is not one of the listed runtimes is marked.",
     "field.autoBootSimulator": "Boot the simulator automatically",
     "field.autoBootSimulator.hint": "When off, tools fail instead of running simctl boot when the target simulator is not booted.",
+    "field.exclusiveSimulator": "One simulator at a time",
+    "field.exclusiveSimulator.hint": "When on, booting a simulator shuts every other booted one down first, so testing different device types never leaves two running. When off, every booted device keeps running.",
     "field.autoOpenSimulator": "Open the Simulator window automatically",
     "field.autoOpenSimulator.hint": "Open the simulator window app for boot/show/open-url/build-and-run: Simulator.app on Xcode 25 and earlier, Device Hub on Xcode 26 and later. A window that cannot open never fails the simctl work; turn this off to stay headless.",
     "field.bootTimeoutSeconds": "Simulator boot timeout (seconds)",

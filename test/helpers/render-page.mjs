@@ -67,6 +67,7 @@ const LIVE_VALUES = {
   defaultDevice: 'iPhone 17',
   defaultRuntime: '',
   autoBootSimulator: true,
+  exclusiveSimulator: true,
   autoOpenSimulator: true,
   bootTimeoutSeconds: 120,
   uiBackend: 'auto',

@@ -50,6 +50,8 @@
     "field.defaultRuntime.hint": "工具未指定运行时时优先使用的已安装运行时，从列表中选择；第一项表示不限运行时。已存的值不在列表中会被标注出来。",
     "field.autoBootSimulator": "自动启动模拟器",
     "field.autoBootSimulator.hint": "关闭后，目标模拟器未启动时相关工具会直接报错，而不是替你执行 simctl boot。",
+    "field.exclusiveSimulator": "同时只运行一台模拟器",
+    "field.exclusiveSimulator.hint": "开启后，启动模拟器会先关闭其他已启动的设备，测试不同机型时不会同时运行两台；关闭后，所有已启动的设备保持运行。",
     "field.autoOpenSimulator": "自动打开模拟器窗口",
     "field.autoOpenSimulator.hint": "在启动/显示/打开 URL/构建并运行时打开模拟器窗口应用：Xcode 25 及更早为 Simulator.app，Xcode 26 及以后为 Device Hub。窗口打不开不会让 simctl 操作失败；关闭本项则完全不弹窗。",
     "field.bootTimeoutSeconds": "模拟器启动超时（秒）",

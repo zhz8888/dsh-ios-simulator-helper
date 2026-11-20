@@ -259,13 +259,13 @@ test('text fields stack, and the switches sit on the row right-hand side', () =>
     row: match[1] !== undefined,
     body: markup.slice(match.index + match[0].length, match.index + match[0].length + 4000),
   }))
-  assert.equal(blocks.length, 18, 'one block per field')
+  assert.equal(blocks.length, 19, 'one block per field')
 
   // The four switches of the field table render as rows; every other control
   // keeps the stacked label/control/hint order inside its block. The lookup
   // goes through the key→label pair the helper collects, because the markup
   // carries the translated copy, not the dictionary keys.
-  const switchKeys = ['autoBootSimulator', 'autoOpenSimulator', 'disableCodeSigning', 'showInSettings']
+  const switchKeys = ['autoBootSimulator', 'exclusiveSimulator', 'autoOpenSimulator', 'disableCodeSigning', 'showInSettings']
   for (const key of switchKeys) {
     const label = report.fieldLabels[report.fieldKeys.indexOf(key)]
     assert.ok(label, `${key} must have a label the helper collected`)
@@ -281,7 +281,7 @@ test('text fields stack, and the switches sit on the row right-hand side', () =>
   }
 
   const stacked = blocks.filter((block) => !block.row)
-  assert.equal(stacked.length, 14, 'the other fourteen fields keep the stacked block')
+  assert.equal(stacked.length, 14, 'the stacked fields keep the stacked block')
   for (const block of stacked) {
     const body = block.body
     const label = body.indexOf('ismh_label')
@@ -293,9 +293,9 @@ test('text fields stack, and the switches sit on the row right-hand side', () =>
   }
 })
 
-test('all 18 fields are rendered, in the host schema order', () => {
-  assert.equal(report.fieldKeys.length, 18)
-  assert.deepEqual(report.fieldLabels.length, 18)
+test('all 19 fields are rendered, in the host schema order', () => {
+  assert.equal(report.fieldKeys.length, 19)
+  assert.deepEqual(report.fieldLabels.length, 19)
   for (const label of report.fieldLabels) {
     assert.ok(report.variants.macos.includes(label), `missing control label: ${label}`)
   }

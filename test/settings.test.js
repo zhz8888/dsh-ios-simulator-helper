@@ -29,8 +29,8 @@ function liveConfig(values) {
   return out
 }
 
-test('the field table is 18 fields in 6 groups', () => {
-  assert.equal(FIELD_KEYS.length, 18)
+test('the field table is 19 fields in 6 groups', () => {
+  assert.equal(FIELD_KEYS.length, 19)
   assert.equal(FIELD_GROUPS.length, 6)
   assert.deepEqual(
     FIELD_GROUPS.map((group) => group.id),
@@ -129,6 +129,7 @@ test('defaults are used when nothing is configured', () => {
   assert.equal(settings.defaultDevice, '')
   assert.equal(settings.defaultRuntime, '')
   assert.equal(settings.autoBootSimulator, true)
+  assert.equal(settings.exclusiveSimulator, true, 'one simulator at a time is the default')
   assert.equal(settings.autoOpenSimulator, true)
   assert.equal(settings.bootTimeoutSeconds, 120)
   assert.equal(settings.uiBackend, 'auto')

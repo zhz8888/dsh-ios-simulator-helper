@@ -10,7 +10,7 @@
 把 ZCode 官方 `ios-simulator@0.1.0` 插件移植为 **DSH（DeepSeek Harness）原生插件**：原有 20 个 MCP 工具全部保留为 DSH 原生工具，并新增一个**参数表单**，渲染在「插件」页该插件自己的页面里（插件 → 已安装插件 → iOS 模拟器助手），让默认设备、运行时、UI 后端、构建参数与输出目录在应用里配置，而不是靠环境变量。
 
 - 工具名、参数名与原插件完全一致，为原 MCP 服务器写的工作流可直接迁移；另新增 1 个 `ios_shutdown_simulator`（原插件能启动模拟器却无法停止它）。
-- 参数页 6 组 18 个字段，全部实时生效；空值按「参数页 → 原插件环境变量 → 内置默认值」顺序回落。
+- 参数页 6 组 19 个字段，全部实时生效；空值按「参数页 → 原插件环境变量 → 内置默认值」顺序回落。
 - 参数页会检测宿主系统：**非 macOS 时直接提示该插件仅支持 macOS**；所有需要调用 Apple 工具链的工具都会以明确的报错拒绝执行，而不是抛出 `spawn xcrun ENOENT`；`ios_preflight` 则报告宿主检查失败，`ios_discover_project`、`ios_create_app` 与 `ios_ui_status` 仍可正常返回。
 - npm 包名为 `@zhz8888/dsh-ios-simulator-helper`；插件页显示的名称由 `locale/` 提供——英文 **iOS Simulator Helper**、中文 **iOS 模拟器助手**——而不是裸包名，两份描述都注明插件为非官方、与 Apple 无隶属关系。
 
@@ -106,6 +106,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 | 模拟器与设备 | `defaultDevice` | 下拉（本机已有模拟器） | 空 | `IOS_SIM_DEFAULT_DEVICE` | 工具未指定 `udid`/`device` 时使用的模拟器，从本机已有设备中选择。留空表示使用插件自身的回退规则——原插件的 `iPhone 16` 片段，再退回第一个可用 iPhone；本机已不存在的值会标注出来 |
 | | `defaultRuntime` | 下拉（本机已装运行时） | 空 | `IOS_SIM_DEFAULT_RUNTIME` | 工具未指定运行时时优先使用的已装运行时，从本机已有运行时中选择；第一项不限运行时。**偏好而非要求**：值过期时自动放宽而不是报错 |
 | | `autoBootSimulator` | 开关 | 开 | `IOS_SIM_AUTO_BOOT` | 关闭后，目标未启动时直接报错，不替你执行 `simctl boot` |
+| | `exclusiveSimulator` | 开关 | 开 | `IOS_SIM_EXCLUSIVE_SIMULATOR` | 开启后，启动模拟器会先关闭其他已启动的设备，测试不同机型时不会同时运行两台 |
 | | `autoOpenSimulator` | 开关 | 开 | `IOS_SIM_AUTO_OPEN` | 与原插件一致地打开模拟器窗口（启动/显示/打开 URL/构建并运行）；关闭后只做 `simctl` 操作 |
 | | `bootTimeoutSeconds` | 整数 | `120` | `IOS_SIM_BOOT_TIMEOUT_MS`（毫秒） | 单条 `simctl boot` / `bootstatus` 的最长等待，单位为秒；旧变量保留毫秒写法并自动换算 |
 | UI 自动化 | `uiBackend` | 下拉 | `auto` | `IOS_SIM_UI_BACKEND` | `auto` 探测 idb；`idb` 强制要求；`none` 关闭 UI 工具；`xcodebuildmcp` 为保留值 |

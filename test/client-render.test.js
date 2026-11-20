@@ -12,7 +12,7 @@ import { ROOT } from './helpers/load-bundle.mjs'
  * key, a field the host never sends, an `inject` face that does not match what
  * the slot renderer calls, or an uncontrolled input. Rendering it through
  * `react-dom/server` turns all of those into a failing test instead of a broken
- * plugin detail page.
+ * configuration page.
  *
  * React is real. `@deepseek-ai/dsh-client-ui-primitives` is doubled, because the
  * shipped package is a browser bundler input (`*.module.css`, `simple-icons`,
@@ -56,10 +56,11 @@ test('the form registers into the plugin row\'s own page', () => {
 })
 
 test('the injected face carries the form actions and the view the page asks for', () => {
-  // The page asks for `view: 'page'`; there is no summary view for a bundle's
-  // own configuration, and the form needs no `label` of its own because the
-  // page draws the title. The lifecycle pair is the page's alone: it marks the
-  // visit whose writes may be confirmed, and acknowledges that confirmation.
+  // The render drives the `page` view — the row's page also asks for a
+  // one-line `summary`, and `view` is how the form tells the two apart — and
+  // the form needs no `label` of its own because the page draws the title. The
+  // lifecycle pair is the page's alone: it marks the visit whose writes may be
+  // confirmed, and acknowledges that confirmation.
   assert.deepEqual(report.injectKeys, [
     'acknowledgeSaved',
     'discard',
@@ -106,7 +107,7 @@ test('a host that does not serve the namespace renders no form at all', () => {
   assert.deepEqual(report.unserved.slots, [], 'no slot may be injected when the namespace is not served')
 })
 
-test('the form draws no title of its own; the plugin detail page owns the chrome', () => {
+test('the form draws no title of its own; the row\'s page owns the chrome', () => {
   // The page draws the plugin's title, icon, crumb and description above this
   // section. Repeating any of that here would render the plugin's name twice on
   // one screen, so the form contributes an effect note and the category cards.

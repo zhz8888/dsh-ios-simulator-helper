@@ -163,14 +163,13 @@ export function checkNamespace(context) {
   return problems
 }
 /**
- * The page must register into the Plugins panel's bundle slot, and nowhere else.
+ * The page must register into the Plugins panel's row slot, and nowhere else.
  *
- * The form is a bundle's own configuration on the Plugins page, in the
- * `plugins.bundle.config` keyed slot. That slot is keyed by the BUNDLE's
- * package name — the value the plugin manager's inventory compares against —
- * so the key is the package name and never the settings namespace. The
- * namespace stays load-bearing as the patch row id whose live form the page
- * binds to.
+ * The form is the plugin row's own configuration on the Plugins page, in the
+ * `plugins.row.config` keyed slot. That slot is keyed by the package name and
+ * the row id, so the key is `<package name>#<namespace>`: the package name is
+ * the value the plugin manager's inventory compares against, and the
+ * namespace is the patch row id whose live form the page binds to.
  *
  * @param {GateContext} context - what the checks read.
  * @returns {string[]} the problems found.

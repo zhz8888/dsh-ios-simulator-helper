@@ -387,7 +387,7 @@ if (registered.component === undefined) {
       report.failures.push(`slot option ${key}=${JSON.stringify(options[key])} (want ${JSON.stringify(expected)})`)
     }
   }
-  if (options.label !== undefined) report.failures.push('the plugin detail page draws its own title; the entry must not register a label')
+  if (options.label !== undefined) report.failures.push('the row\'s page draws its own title; the entry must not register a label')
 
   let props
   try {

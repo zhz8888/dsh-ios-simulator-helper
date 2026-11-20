@@ -496,7 +496,7 @@ test('the /ios-dev command runs the diagnostic and reports a verdict', async () 
   }
   assert.match(result.text, /iOS Simulator environment/)
   // The report used to point at Settings -> iOS Simulator; the form now lives
-  // on the plugin's detail view in the Plugins panel.
+  // on the plugin row's own page in the Plugins panel.
   assert.match(result.text, /Environment values are edited on this plugin's page in the Plugins panel/)
   assert.match(result.text, /Plugins → Installed plugins → iOS Simulator Helper/)
 })

@@ -574,9 +574,10 @@ test('only a nested macro sandbox failure triggers the sandbox retry', () => {
 
 test('the diagnostic fix hints name the plugin page in the Plugins panel', () => {
   // Both hints used to send the user to the Settings dialog — a location that
-  // no longer holds them after the form moved to the plugin detail view. The
-  // phrase is one exported constant so a stale instruction is a test failure,
-  // and each interpolation is counted so a hand-written replacement is caught.
+  // holds them only when the opt-in switch is on, since the form moved to the
+  // plugin row's own page. The phrase is one exported constant so a stale
+  // instruction is a test failure, and each interpolation is counted so a
+  // hand-written replacement is caught.
   assert.match(PAGE_LOCATION, /Plugins panel/)
   assert.match(PAGE_LOCATION, /iOS Simulator Helper/)
   const source = readFileSync(new URL('../lib/providers/preflight.js', import.meta.url), 'utf8')

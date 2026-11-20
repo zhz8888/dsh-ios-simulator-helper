@@ -135,25 +135,23 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 
 ## 截图
 
-四张都是 DSH harness 0.2.1-rc.2 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。展示的是 1.1.0 的卡片式布局与按整秒填写的超时；保存操作条只在有暂存改动时出现，因此这几张里看不到它。截图时窗口用的是中文界面，卡片标题为中文，字段名两种语言一致。
-
-> 这几张截图早于「移到插件行自己的页面」这次改动：它们展示的是表单渲染在 bundle 详情页里的旧位置。页面本身——卡片、字段与保存栏——没有变化，变化的只是打开位置。稍后会从该行的 **Configure** 页面重新截图。
+四张都是 DSH harness 0.2.2-rc.5 里这份代码跑起来的真实页面，按从上到下的滚动顺序排列，没有做图。展示的是当前的卡片式布局与按整秒填写的超时；保存操作条只在有暂存改动时出现，因此这几张里看不到它。截图时窗口用的是中文界面，卡片标题为中文，字段名两种语言一致。表单位于插件行自己的页面，由该行的**配置**入口打开。
 
 **1. 模拟器与设备** —— 插件标题与描述，以及每次 `ios_*` 调用都会读取的字段：
 
-![「插件」页里的 iOS 模拟器助手：插件标题、版本与描述，接着是模拟器与设备卡片，含默认设备、默认运行时、自动启动、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
+![iOS 模拟器助手配置页：插件标题与描述，接着是模拟器与设备卡片，含默认设备、默认运行时、自动启动、同时只运行一台模拟器、自动打开窗口与启动超时](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI 自动化与构建** —— `idb` 后端与其超时，接着是 `xcodebuild` 的配置、构建超时与额外参数：
 
-![表单滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时与额外 xcodebuild 参数](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
+![表单滚动到 UI 自动化与构建分组：UI 后端、idb 可执行文件、UI 操作超时、默认构建配置、构建超时、额外 xcodebuild 参数、构建数据目录与构建时禁用代码签名](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. 构建尾部与日志** —— 构建数据目录与代码签名开关，接着是 `ios_logs` 的窗口与字符上限，以及输出目录的开头：
+**3. 日志与输出目录** —— `ios_logs` 的窗口与字符上限，以及截图/日志/构建数据的落盘位置：
 
-![表单继续向下滚动：构建数据目录、构建时禁用代码签名，接着是默认日志窗口与默认日志字符上限，以及数据目录与截图目录的开头](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![表单继续向下滚动：默认日志窗口与默认日志字符上限，接着是数据目录与截图目录](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
-**4. 输出目录与宿主检测** —— 截图/日志/构建数据的落盘位置，然后是 macOS 判定与两个检测按钮：
+**4. 页面位置与宿主检测** —— 表单是否也出现在「设置」中，然后是 macOS 判定与两个检测按钮：
 
-![表单底部：数据目录与截图目录，以及宿主系统判定为「macOS —— 符合要求（darwin/arm64）」与检测环境、刷新模拟器两个按钮](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
+![表单底部：页面位置开关，以及宿主系统判定为「macOS —— 符合要求（darwin/arm64）」与检测环境、刷新模拟器两个按钮和探测出的 Xcode、运行时与设备摘要](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` 就在仓库里的 `package.json` 旁边按这个顺序列出四张图，插件市场据此展示。
 

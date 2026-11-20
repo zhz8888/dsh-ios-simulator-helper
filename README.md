@@ -135,25 +135,23 @@ The original plugin's `userConfig` (`default_device`, `ui_backend`) and its envi
 
 ## Screenshots
 
-All four are the live page in DSH harness 0.2.1-rc.2, in the order you scroll it — nothing is mocked up. They show the 1.1.0 card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the card headings are Chinese while every field name is the same in both languages.
-
-> These shots predate the move to the plugin row's own page: they show the form inside the bundle's detail view, which is where it used to render. The page itself — the cards, the fields and the save bar — is unchanged; only where it opens has moved. They will be re-captured from the row's **Configure** page.
+All four are the live page in DSH harness 0.2.2-rc.5, in the order you scroll it — nothing is mocked up. They show the current card layout and the timeouts in whole seconds; the save bar only appears while an edit is staged, so it is not in these shots. The window ran the Chinese locale, so the card headings are Chinese while every field name is the same in both languages. The form is on the plugin row's own page, opened through the row's **Configure** control.
 
 **1. Simulator and device** — the plugin heading and description, then the fields every `ios_*` call reads:
 
-![The iOS Simulator Helper page in the Plugins panel: the plugin title, version and description, then the simulator-and-device card with the default device, default runtime, auto boot, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
+![The iOS Simulator Helper configuration page: the plugin title and description, then the simulator-and-device card with the default device, default runtime, auto boot, the one-simulator-at-a-time rule, auto open and the boot timeout](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-1-simulator-and-device.png)
 
 **2. UI automation and builds** — the `idb` backend and its timeout, then the `xcodebuild` configuration, build timeout and extra arguments:
 
-![The form scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout and the extra xcodebuild arguments](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
+![The form scrolled to UI automation and build settings: UI backend, idb binary, UI timeout, default configuration, build timeout, the extra xcodebuild arguments, the DerivedData directory and the code-signing switch](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-2-ui-automation-and-build.png)
 
-**3. Build tail and logs** — the DerivedData directory and the code-signing switch, then the `ios_logs` window and character limit, and the start of the output directories:
+**3. Logs and output directories** — the `ios_logs` window and character limit, then where screenshots, logs and DerivedData land:
 
-![The form scrolled further: the DerivedData directory and code signing during builds, then the default log window and character limit, and the start of the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
+![The form scrolled further: the default log window and character limit, then the data and screenshot directories](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-3-logs-and-output.png)
 
-**4. Output directories and the host check** — where screenshots, logs and DerivedData land, then the macOS verdict with the two detection buttons:
+**4. Page location and the host check** — whether the form also appears in Settings, then the macOS verdict with the two detection buttons:
 
-![The bottom of the form: the data and screenshot directories, then the host check reading "macOS — supported (darwin/arm64)" with the run-diagnostic and refresh buttons](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
+![The bottom of the form: the page-location switch, then the host check reading "macOS — supported (darwin/arm64)" with the run-diagnostic and refresh buttons and the discovered Xcode, runtime and device summary](https://raw.githubusercontent.com/zhz8888/dsh-ios-simulator-helper/main/assets/settings-page-4-host-check.png)
 
 `screenshots.json` lists these four files in this order next to `package.json` in the repository, which is how a plugin market finds them.
 

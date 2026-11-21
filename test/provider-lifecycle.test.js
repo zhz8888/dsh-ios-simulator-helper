@@ -43,9 +43,13 @@ const PAIR_UDID = 'A1B2C3D4-1111-2222-3333-444455556666'
 /** A single iPhone. */
 const PHONE_UDID = 'B1B2C3D4-7777-8888-9999-000011112222'
 
+/** A second booted device, so the exclusive sweep can fail twice. */
+const IPAD_UDID = 'C1B2C3D4-AAAA-BBBB-CCCC-DDDDEEEEFFFF'
+
 /** The device-type identifiers the pair and the single device carry. */
 const PAIR_TYPE = 'com.apple.CoreSimulator.SimDeviceType.iPhone-Duo'
 const PHONE_TYPE = 'com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro'
+const IPAD_TYPE = 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M4'
 
 /**
  * The exact text a sandboxed build fails with, which `macroSandboxDenied` recognises.
@@ -536,6 +540,50 @@ test('exclusive mode shuts the other booted device down before booting the targe
     const shutdownAt = seam.calls.findIndex((item) => item.line.includes(`shutdown ${PAIR_UDID}`))
     const bootAt = seam.calls.findIndex((item) => item.line.includes(`boot ${PHONE_UDID}`))
     assert.ok(shutdownAt !== -1 && bootAt !== -1 && shutdownAt < bootAt, 'shutdown precedes boot')
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('an unreadable device payload is reported the way the diagnostic reports it', async () => {
+  // `list()` reads the same payload `preflight` does, so it has to say the same
+  // thing about it. A bare `SyntaxError` ("Unexpected token 'o'…") names neither
+  // the command nor the plugin, and the two paths would then describe one
+  // failure two different ways.
+  seam.reset()
+  seam.devices = 'not json at all'
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-unreadable-'))
+  try {
+    const { list, listRuntimes } = await import('../lib/providers/sim.js')
+    await assert.rejects(() => list(runtimeFor(root)), /could not parse/)
+    seam.runtimes = 'not json at all'
+    await assert.rejects(() => listRuntimes(runtimeFor(root)), /could not parse/)
+  } finally {
+    seam.reset()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('every failed exclusive shutdown is reported, not only the last one', async () => {
+  // The exclusive rule is a convenience: a shutdown that fails is reported and
+  // the boot proceeds. Reporting only the last failure would leave the caller
+  // believing the other device was stopped, so every failure is kept.
+  seam.reset()
+  seam.allowMutations = true
+  seam.devices = devicesPayload([
+    { name: 'iPhone Duo', udid: PAIR_UDID, state: 'Booted', isAvailable: true, deviceTypeIdentifier: PAIR_TYPE },
+    { name: 'iPad Pro', udid: IPAD_UDID, state: 'Booted', isAvailable: true, deviceTypeIdentifier: IPAD_TYPE },
+    { name: 'iPhone 18 Pro', udid: PHONE_UDID, state: 'Shutdown', isAvailable: true, deviceTypeIdentifier: PHONE_TYPE },
+  ])
+  seam.simctl.shutdown = { code: 1, stderr: 'Unable to shutdown device in current state: Booted' }
+  const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-life-exclusive-warn-'))
+  try {
+    const result = await boot(runtimeFor(root), { device: 'iPhone 18 Pro' })
+    assert.equal(result.state, 'Booted', 'a failed shutdown must not fail the boot')
+    assert.equal(typeof result.shutdownWarning, 'string')
+    assert.match(result.shutdownWarning, /iPhone Duo/, 'the first failure is reported')
+    assert.match(result.shutdownWarning, /iPad Pro/, 'the second failure is reported too')
   } finally {
     seam.reset()
     await rm(root, { recursive: true, force: true })

@@ -442,7 +442,37 @@ test('every tool result names only the fields its output schema declares', {
     await dispatched('ios_list_simulators')
     await dispatched('ios_create_app', { name: 'Demo' })
     await dispatched('ios_discover_project')
-    const booted = await dispatched('ios_boot_simulator')
+    // The exclusive rule fails both shutdowns, so the boot result carries the
+    // `shutdownWarning` field the schema has to declare. Without this the field
+    // is only ever produced on a machine where a shutdown fails, which is
+    // exactly the case a schema drift would hide.
+    seam.devices = JSON.stringify({
+      devices: {
+        'com.apple.CoreSimulator.SimRuntime.iOS-27-1': [
+          {
+            name: 'iPhone Duo',
+            udid: '2F4A1B3C-5D6E-4F70-8A9B-0C1D2E3F4A5B',
+            state: 'Booted',
+            isAvailable: true,
+            deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-Duo',
+          },
+          {
+            name: 'iPhone 18 Pro',
+            udid: 'B1B2C3D4-7777-8888-9999-000011112222',
+            state: 'Shutdown',
+            isAvailable: true,
+            deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro',
+          },
+        ],
+      },
+    })
+    seam.simctl.shutdown = { code: 1, stderr: 'Unable to shutdown device in current state: Booted' }
+    const booted = await dispatched('ios_boot_simulator', { device: 'iPhone 18 Pro' })
+    assert.equal(typeof booted.shutdownWarning, 'string', 'the fixture must produce the warning the comparison checks')
+    seam.restore()
+    seam.allowMutations = true
+    seam.buildProduct = true
+    seam.idbInstalled = true
     // A positive control: the seam's device carries a type, so the comparison
     // below really sees the optional `deviceType` field a real `simctl` reports
     // — and a schema that stopped declaring it would fail this case.

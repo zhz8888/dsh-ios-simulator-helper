@@ -275,6 +275,18 @@ try {
     linux: api.detectClientPlatform(NAVIGATORS.linux),
     windows: api.detectClientPlatform(NAVIGATORS.windows),
     none: api.detectClientPlatform(undefined),
+    // An iPad in desktop mode reports `platform: "MacIntel"` and a user agent
+    // that contains "iPad; CPU OS … like Mac OS X". Testing /mac/ first would
+    // read it as a supported macOS host and hide the "only supports macOS"
+    // notice on a device that cannot run a single ios_* tool.
+    ipadDesktop: api.detectClientPlatform({
+      platform: 'MacIntel',
+      userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    }),
+    iphone: api.detectClientPlatform({
+      platform: 'iPhone',
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    }),
     hostWins: api.hostVerdict(api.detectClientPlatform(NAVIGATORS.macos), {
       supported: false,
       platform: 'linux',

@@ -341,6 +341,17 @@ test('the pure host verdict prefers the host route over the browser', () => {
   assert.equal(report.hostApi.requiredPlatform, 'darwin')
 })
 
+test('an iPad in desktop mode is not read as a supported macOS host', () => {
+  // iPadOS reports `platform: "MacIntel"` and a user agent containing "iPad;
+  // CPU OS 17_0 like Mac OS X", so a /mac/ test that runs first classifies it
+  // as macOS and suppresses the "only supports macOS" notice on a device that
+  // cannot run a single ios_* tool. The iOS test therefore comes first.
+  assert.deepEqual(report.hostApi.ipadDesktop, { platform: 'ios', label: 'iOS', supported: false })
+  assert.deepEqual(report.hostApi.iphone, { platform: 'ios', label: 'iOS', supported: false })
+  // A real Mac still reads as macOS: the reordering must not cost that.
+  assert.deepEqual(report.hostApi.macos, { platform: 'darwin', label: 'macOS', supported: true })
+})
+
 test('the host check, diagnostics, discovery and save controls are present', () => {
   const markup = report.variants.macos
   assert.match(markup, /Run diagnostic/)

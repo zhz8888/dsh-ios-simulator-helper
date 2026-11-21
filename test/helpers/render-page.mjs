@@ -31,6 +31,8 @@ const report = {
   failures: [],
   variants: {},
   toast: null,
+  placements: null,
+  summary: null,
   registered: null,
   unserved: null,
   fieldKeys: [],
@@ -398,6 +400,15 @@ if (registered.component === undefined) {
 
   if (props !== undefined) {
     report.injectKeys = Object.keys(props).sort()
+    // The row's page asks for a one-line summary as well as the form, and the
+    // two views must not change the hook count: a summary answered above the
+    // hooks would throw "Rendered more hooks" the moment one instance rendered
+    // both. Rendering the summary here is what pins that.
+    try {
+      report.summary = renderToStaticMarkup(React.createElement(component, { ...props, view: 'summary' }))
+    } catch (error) {
+      report.failures.push(`summary render threw: ${error.stack ?? error.message}`)
+    }
     for (const [name, navigatorStub] of Object.entries(NAVIGATORS)) {
       setNavigator(navigatorStub)
       try {
@@ -506,8 +517,34 @@ if (registered.component === undefined) {
       props.save()
       await settle()
       report.toast.offscreen = renderToStaticMarkup(React.createElement(component, props))
-      props.pageMounted()
+      const remount = props.pageMounted()
       report.toast.remount = renderToStaticMarkup(React.createElement(component, props))
+
+      // ── two placements of the same form ───────────────────────────────────
+      // The row's page and the Settings dialog can both be on screen, and the
+      // placement count is the controller's so that closing one leaves the
+      // other alone. A component-local counter would count only itself: the
+      // first teardown would report "last" and drop the other's staged edits.
+      //
+      // The remount above is still open, so it is closed first: the probe has to
+      // start from a known count, or "the second teardown is the last" would be
+      // measuring the leftover placement instead of the two it opened.
+      remount()
+      const first = props.pageMounted()
+      const second = props.pageMounted()
+      props.edit('bootTimeoutSeconds', '70')
+      const stagedWhileBothOpen = renderToStaticMarkup(React.createElement(component, props))
+      const firstWasLast = first()
+      const stagedAfterOneLeft = renderToStaticMarkup(React.createElement(component, props))
+      const secondWasLast = second()
+      report.placements = {
+        stagedWhileBothOpen,
+        stagedAfterOneLeft,
+        firstWasLast,
+        secondWasLast,
+        // A teardown that runs twice must not decrement twice.
+        firstAgain: first(),
+      }
     } catch (error) {
       report.failures.push(`toast lifecycle threw: ${error.stack ?? error.message}`)
     }

@@ -481,6 +481,29 @@ test('a landing that arrives while the page is off screen is never announced lat
   assert.ok(!report.toast.remount.includes('data-toast'), 'a new visit must not replay it')
 })
 
+test('the summary view renders the one-liner without changing the hook count', () => {
+  // The row's page asks for `view: 'summary'` under the title and `view: 'page'`
+  // for the form. Answering the summary above the hooks would make the hook
+  // count depend on the view, and an instance that rendered both would throw
+  // "Rendered more hooks than during the previous render".
+  assert.match(report.summary, /^<span>Simulator, build, log and output parameters for this plugin’s tools\.<\/span>$/)
+  assert.ok(!report.summary.includes('ismh_page'), 'the summary is a sentence, not the form')
+})
+
+test('two placements of the form share one count, so closing one keeps the other', () => {
+  // The same form can be on the row's page and in the Settings dialog at once.
+  // The count lives on the controller, which both placements share: a
+  // component-local counter would count only itself, so the first teardown
+  // would report "last" and drop the other placement's staged edits.
+  assert.equal(report.placements.firstWasLast, false, 'the first teardown is not the last placement')
+  assert.equal(report.placements.secondWasLast, true, 'the second teardown is the last placement')
+  assert.equal(report.placements.firstAgain, false, 'a teardown that runs twice must not decrement twice')
+  // The staged draft survives the first placement leaving, and is still the
+  // pending change the bar reports.
+  assert.match(report.placements.stagedAfterOneLeft, /Unsaved changes/)
+  assert.match(report.placements.stagedWhileBothOpen, /Unsaved changes/)
+})
+
 test('the bar state machine covers clean, pending, blocked and failed', () => {
   const bar = report.actionBar
   assert.equal(bar.clean, null, 'a clean form has nothing to say')

@@ -213,7 +213,7 @@ Two behaviours deserve their own note:
 - Swift macros (`@State`, `#Preview`) need `swift-plugin-server`, which cannot start its nested `sandbox-exec` when the caller is itself sandboxed. `ios_build_app` then retries the build once with `OTHER_SWIFT_FLAGS=-disable-sandbox` and reports `macroSandboxRetry: true`; a caller that was never sandboxed never sees a retry.
 - The generated project template is byte-for-byte the original's (an Xcode 14-compatible `project.pbxproj`, `objectVersion = 56`) and does not track newer Xcode templates.
 - **The configuration page has only been checked by eye in DSH Desktop**: the plugin is installed into the `desktop` profile, and the four shots in `assets/` are the latest manual pass, top to bottom. Dark theme, narrow-width wrapping and the non-macOS notice are still covered by the render tests, not by eye.
-- No credential handling: the plugin never reads or forwards key/token/secret environment variables.
+- No credential handling: the plugin never reads a key/token/secret environment variable, and never adds one to a child process. The commands it runs inherit the harness process environment, because `xcodebuild` needs `PATH`, `HOME` and `DEVELOPER_DIR` to work at all.
 
 ## Releases
 

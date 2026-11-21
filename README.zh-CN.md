@@ -213,7 +213,7 @@ dsh plugin --profile <profile> add @zhz8888/dsh-ios-simulator-helper \
 - Swift 宏（`@State`、`#Preview` 等）需要 `swift-plugin-server` 启动 `sandbox-exec`；调用方本身已在沙箱内时这一步会失败，`ios_build_app` 会自动补上 `OTHER_SWIFT_FLAGS=-disable-sandbox` 重试一次，并在结果里标记 `macroSandboxRetry: true`。从未处于沙箱内的调用方不会触发重试。
 - 生成工程模板与原插件逐字保留（`project.pbxproj` 为 Xcode 14 兼容格式、`objectVersion = 56`），未跟随新版 Xcode 的模板变化。
 - **配置页面只在 DSH Desktop 里做过人工目视确认**：插件装在 `desktop` profile，`assets/` 里那四张按顺序就是最近一次手动检查的界面。暗色主题、窄屏换行与非 macOS 提示条仍只有渲染测试覆盖，没有目视。
-- 插件不触碰凭据：不读取、不转发任何含 key/token/secret 的环境变量。
+- 插件不触碰凭据：不读取任何含 key/token/secret 的环境变量，也不会把这类变量加进子进程。它执行的命令会继承 harness 进程的环境，因为 `xcodebuild` 离开 `PATH`、`HOME` 和 `DEVELOPER_DIR` 根本无法工作。
 
 ## 版本与发布
 
